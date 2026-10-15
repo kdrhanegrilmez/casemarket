@@ -1,15 +1,29 @@
 
-import os
-from pathlib import Path
 
-import psycopg
-from dotenv import load_dotenv
-from fastapi import FastAPI
+from decimal import Decimal
+
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+from database import get_connection
+#database.py içerisindeki bağlantı fonksiyonumuzu kullanmamızı sağlıyor.
 
 app = FastAPI()
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+class ProductCreate(BaseModel):
+    name:str = Field(min_length=3,max_length=100)
+    price:Decimal =Field(gt=0,max_digits=10, decimal_places=2)
+    #fiyat toplam en fazla 10 basamak ve decimal_places=2 ile virgülden sonra en fazla 2 bsamak alıyoruz
+    #gt=0, burada fiyatın 0 dan büyük olmasını istiyoruz ve basamaklı fiyatlara izin veriyoruz
+    stock:int =Field(ge=0)
+    seller_id:int = Field(gt=0)
+
+
+
+class ProductStockUpdate(BaseModel):
+    stock:int =Field(ge=0)
+
 
 
 @app.get("/")
@@ -20,18 +34,7 @@ def home():
 @app.get("/api/products")
 def get_products():
 
-    db_password = os.getenv("POSTGRES_PASSWORD")
-
-    if not db_password:
-        raise RuntimeError("Veritabani sifresi bulunamadi!")
-
-    with psycopg.connect(
-        host="127.0.0.1",
-        port=5433,
-        dbname="casemarket_db",
-        user="casemarket_user",
-        password=db_password
-    ) as connection:
+    with get_connection() as connection:
 
         with connection.cursor() as cursor:
             cursor.execute("""
@@ -63,3 +66,130 @@ def get_products():
         products.append(product)
 
     return products
+
+
+
+
+@app.get("/api/products/{product_id}")
+def get_product(product_id: int):
+
+    with get_connection() as connection:
+
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    p.id,
+                    p.name,
+                    p.price,
+                    p.stock,
+                    s.store_name
+                FROM practice_products AS p
+                LEFT JOIN practice_seller AS s
+                    ON p.seller_id = s.id
+                WHERE p.id = %s;
+            """, (product_id,))
+
+            row = cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Urun bulunamadi!"
+        )
+
+    product = {
+        "id": row[0],
+        "name": row[1],
+        "price": str(row[2]),
+        "stock": row[3],
+        "seller": row[4]
+    }
+
+    return product
+
+
+@app.post("/api/products", status_code=201)
+def create_product(product: ProductCreate):
+
+    with get_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            #önce satıcı gerçekten bizim sistemimizde bir satıcı mı.
+            #yani id'si bize kayıtlı mı, db de öyle bir kullanıcı var mı check et
+
+            cursor.execute(
+                "SELECT 1 FROM practice_seller WHERE id=%s ",
+                (product.seller_id,)
+            )
+            seller_exist =cursor.fetchone()
+            if seller_exist is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Kayitli satici bulunamadi!"
+                )
+
+            cursor.execute("""
+                INSERT INTO practice_products
+                    (name, price, stock, seller_id)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id;
+            """, (
+                product.name,
+                product.price,
+                product.stock,
+                product.seller_id
+            ))
+
+            new_product_id = cursor.fetchone()[0]
+
+    return {
+        "message": "Urun basariyla kaydedildi!",
+        "id": new_product_id,
+        "name": product.name,
+        "price": str(product.price),
+        "stock": product.stock,
+        "seller_id": product.seller_id
+    }
+
+
+
+
+
+
+
+@app.patch("/api/products/{product_id}/stock")
+def update_product_stock(
+    product_id: int,
+    update: ProductStockUpdate
+):
+
+    with get_connection() as connection:
+
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE practice_products
+                SET stock = %s
+                WHERE id = %s
+                RETURNING id, name, stock;
+            """, (update.stock, product_id))
+
+            row = cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Urun bulunamadi!"
+        )
+
+    return {
+        "id": row[0],
+        "name": row[1],
+        "stock": row[2],
+        "message": "Stok basariyla guncellendi!"
+    }
+
+
+
+
+
