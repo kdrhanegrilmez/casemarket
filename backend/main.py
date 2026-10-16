@@ -4,12 +4,31 @@ from decimal import Decimal
 
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+#iki farklı port arasında tarayıcada veri paylaşımı güveliğini sağlar
 from pydantic import BaseModel, Field
 
 from database import get_connection
 #database.py içerisindeki bağlantı fonksiyonumuzu kullanmamızı sağlıyor.
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    #REACT'ın çalıştığı adreslere izin verir.
+    allow_credentials=False,
+    #Şimdilik tarayıcı kimlik bilgilerinin gönderilmesine izin vermez
+    allow_methods=["GET"],
+    #React'ın okuma isteklerine izin verir.
+    allow_headers=["*"],
+    #İstekte kullanılabilecek HTTP başlıklarına izin verir
+)
+
+
 
 class ProductCreate(BaseModel):
     name:str = Field(min_length=3,max_length=100)
