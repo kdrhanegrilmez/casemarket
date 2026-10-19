@@ -19,3 +19,11 @@ class UserLogin(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class UserPublic(BaseModel):
+    id:int
+    full_name: str
+    email: EmailStr
+    role: str
+    
