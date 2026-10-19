@@ -1,15 +1,26 @@
 
 
+import os
+from datetime import datetime, timedelta, timezone
+
+import jwt
+from argon2.exceptions import VerificationError, InvalidHashError
+
 from decimal import Decimal
 
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from argon2 import PasswordHasher
+from psycopg.errors import UniqueViolation
 #iki farklı port arasında tarayıcada veri paylaşımı güveliğini sağlar
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
+from pygments.lexers import data
 
 from database import get_connection
 #database.py içerisindeki bağlantı fonksiyonumuzu kullanmamızı sağlıyor.
+
+
 
 app = FastAPI()
 
@@ -210,5 +221,58 @@ def update_product_stock(
 
 
 
+# Kullanıcı kaydı
 
+password_hasher = PasswordHasher()
+
+
+class UserRegister(BaseModel):
+    full_name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+@app.post("/api/auth/register", status_code=201)
+def register_user(data: UserRegister):
+    full_name = data.full_name.strip()
+
+    if len(full_name) < 2:
+        raise HTTPException(
+            status_code=422,
+            detail="Ad en az 2 karakter olmali."
+        )
+
+    password_hash = password_hasher.hash(data.password)
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users
+                        (full_name, email, password_hash, role)
+                    VALUES (%s, %s, %s, 'customer')
+                    RETURNING id, full_name, email, role
+                    """,
+                    (
+                        full_name,
+                        str(data.email).lower(),
+                        password_hash
+                    )
+                )
+
+                user = cur.fetchone()
+
+    except UniqueViolation:
+        raise HTTPException(
+            status_code=409,
+            detail="Bu e-posta adresi zaten kayitli."
+        ) from None
+
+    return {
+        "id": user[0],
+        "full_name": user[1],
+        "email": user[2],
+        "role": user[3]
+    }
 
