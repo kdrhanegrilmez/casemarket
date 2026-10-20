@@ -5,10 +5,13 @@ import {useEffect,useState} from "react";
 
 import './App.css'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
-
-
-
+const formatPrice = (price) =>
+  Number(price).toLocaleString('tr-TR', {
+    style: 'currency',
+    currency: 'TRY',
+  })
 
 function App() {
 
@@ -48,7 +51,7 @@ function removeFromCart(indexToRemove) {
 
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/products')
+    fetch(`${API_BASE_URL}/api/catalog/products`)
       .then((response) => {
         if (!response.ok) {
           throw new Error('Urunler getirilemedi')
@@ -141,7 +144,7 @@ function removeFromCart(indexToRemove) {
                         >
                         <div>
                           <strong>{item.name}</strong>
-                          <p>{item.price} TL</p>
+                          <p>{formatPrice(item.price)}</p>
                         </div>
 
                         <button
@@ -230,19 +233,33 @@ function removeFromCart(indexToRemove) {
       <article className="product-card" key={product.id}>
 
         <div className="product-visual">
-          <div className="case-shape"></div>
+          <img
+            src={product.image_url}
+            alt={product.name}
+            loading="lazy"
+            onError={(event) => {
+              event.currentTarget.hidden = true
+              event.currentTarget.nextElementSibling.hidden = false
+            }}
+          />
+          <div className="product-image-fallback" hidden aria-hidden="true">
+            CM
+          </div>
         </div>
 
         <div className="product-info">
           <span className="product-seller">
-            {product.seller}
+            {product.store_name}
           </span>
 
           <h3>{product.name}</h3>
+          <p className="product-description">{product.description}</p>
 
           <div className="product-bottom">
-            <strong>{product.price} TL</strong>
-            <span>Stok: {product.stock}</span>
+            <strong>{formatPrice(product.price)}</strong>
+            <span className={product.stock === 0 ? 'out-of-stock' : ''}>
+              {product.stock === 0 ? 'Tükendi' : `Stok: ${product.stock}`}
+            </span>
           </div>
         </div>
 
@@ -252,7 +269,7 @@ function removeFromCart(indexToRemove) {
           disabled={product.stock === 0 }
           onClick={()=>addToCart(product)}
         >
-          Sepete Ekle +
+          {product.stock === 0 ? 'Stokta Yok' : 'Sepete Ekle +'}
         </button>
       </article>
     ))}

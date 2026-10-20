@@ -14,6 +14,7 @@ class RouteCompatibilityTests(unittest.TestCase):
         expected_routes = {
             ("GET", "/"),
             ("GET", "/api/products"),
+            ("GET", "/api/catalog/products"),
             ("GET", "/api/products/{product_id}"),
             ("POST", "/api/products"),
             ("PATCH", "/api/products/{product_id}/stock"),
