@@ -1,0 +1,401 @@
+
+.seller-dashboard {
+  max-width: 1450px;
+  min-height: 75vh;
+  margin: 0 auto;
+  padding: 45px 6% 100px;
+}
+
+.seller-dashboard__navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 55px;
+}
+
+.seller-dashboard__navigation button {
+  padding: 0;
+  background: none;
+  border: 0;
+  font-size: 13px;
+  color: #62675e;
+}
+
+.seller-dashboard__navigation span {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #989387;
+}
+
+.seller-dashboard__heading {
+  margin-bottom: 45px;
+}
+
+.seller-dashboard__heading > p,
+.seller-dashboard__section-heading span {
+  color: #9c8e7c;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.seller-dashboard__heading h1 {
+  margin: 13px 0;
+  color: #202521;
+  font-size: clamp(37px, 5vw, 64px);
+  font-weight: 600;
+  letter-spacing: -3px;
+}
+
+.seller-dashboard__heading > span {
+  color: #81847b;
+  font-size: 14px;
+}
+
+.seller-dashboard__store {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  background: #202521;
+  color: #fffefa;
+  padding: 35px;
+  margin-bottom: 25px;
+}
+
+.seller-dashboard__store > div > span {
+  color: #c6b79d;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+
+.seller-dashboard__store h2 {
+  margin: 12px 0;
+  font-size: 27px;
+  font-weight: 600;
+}
+
+.seller-dashboard__store p {
+  color: #bec3b9;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.seller-dashboard__store-icon {
+  display: grid;
+  place-items: center;
+  width: 75px;
+  height: 75px;
+  flex-shrink: 0;
+  border: 1px solid #8b9486;
+  color: #d7c8aa;
+  font-family: Georgia, serif;
+  font-size: 27px;
+}
+
+.seller-dashboard__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-bottom: 55px;
+}
+
+.seller-dashboard__stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  padding: 28px;
+  background: #fffefa;
+  border: 1px solid #e6e3dd;
+}
+
+.seller-dashboard__stats span {
+  font-size: 12px;
+  color: #7f8379;
+}
+
+.seller-dashboard__stats strong {
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -2px;
+}
+
+.seller-dashboard__products {
+  background: #fffefa;
+  border: 1px solid #e6e3dd;
+}
+
+.seller-dashboard__section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 30px;
+}
+
+.seller-dashboard__section-heading h2 {
+  font-size: 29px;
+  margin: 10px 0 0;
+  letter-spacing: -1px;
+}
+
+.seller-dashboard__section-heading button {
+  padding: 11px 17px;
+  border: 1px solid #d9d6cd;
+  background: transparent;
+  color: #202521;
+  font-size: 12px;
+}
+
+.seller-dashboard__section-heading button:hover {
+  background: #202521;
+  color: white;
+}
+
+.seller-dashboard__table-wrap {
+  overflow-x: auto;
+}
+
+.seller-dashboard__table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.seller-dashboard__table th {
+  background: #f2f0eb;
+  color: #7c8076;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 17px 30px;
+}
+
+.seller-dashboard__table td {
+  padding: 21px 30px;
+  border-top: 1px solid #eae7e1;
+  white-space: nowrap;
+}
+
+.seller-dashboard__table td strong,
+.seller-dashboard__table td small {
+  display: block;
+}
+
+.seller-dashboard__table td small {
+  margin-top: 7px;
+  color: #a1a39b;
+}
+
+.seller-status {
+  display: inline-block;
+  padding: 7px 11px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.seller-status--active {
+  background: #e6ede5;
+  color: #557251;
+}
+
+.seller-status--inactive {
+  background: #f2e6e2;
+  color: #9a5248;
+}
+
+.seller-dashboard__message {
+  padding: 30px;
+  color: #7f8379;
+}
+
+.seller-dashboard__error {
+  padding: 25px;
+  background: #f8eae6;
+  color: #944b40;
+  margin-bottom: 30px;
+}
+
+.seller-dashboard__error button {
+  padding: 10px 15px;
+  border: 1px solid #944b40;
+  background: transparent;
+  color: inherit;
+}
+
+@media (max-width: 700px) {
+  .seller-dashboard {
+    padding: 30px 20px 65px;
+  }
+
+  .seller-dashboard__navigation span {
+    display: none;
+  }
+
+  .seller-dashboard__store {
+    padding: 25px;
+  }
+
+  .seller-dashboard__store-icon {
+    display: none;
+  }
+
+  .seller-dashboard__stats {
+    gap: 9px;
+  }
+
+  .seller-dashboard__stats > div {
+    padding: 15px 12px;
+  }
+
+  .seller-dashboard__stats span {
+    font-size: 10px;
+  }
+
+  .seller-dashboard__stats strong {
+    font-size: 29px;
+  }
+
+  .seller-dashboard__section-heading {
+    padding: 22px;
+  }
+
+  .seller-dashboard__table th,
+  .seller-dashboard__table td {
+    padding: 15px 18px;
+  }
+}
+
+
+
+
+/* ==========================================
+   YENI URUN EKLEME FORMU
+   Satici panelindeki urun kayit bolumunun tasarimi
+   ========================================== */
+
+.seller-create {
+  background: #fffefa;
+  border: 1px solid #e6e3dd;
+  padding: 32px;
+  margin-bottom: 35px;
+}
+
+.seller-create__heading {
+  margin-bottom: 30px;
+}
+
+.seller-create__heading > span {
+  font-size: 10px;
+  color: #9c8e7c;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.seller-create__heading h2 {
+  margin: 12px 0;
+  font-size: 30px;
+  color: #202521;
+  letter-spacing: -1px;
+}
+
+.seller-create__heading p {
+  color: #81847b;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/*
+ * CSS GRID:
+ * Form alanlarini iki sutuna ayiriyoruz.
+ * Boylece masaustu ekraninda daha duzenli gorunuyor.
+ */
+.seller-create__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.seller-create__field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #40443e;
+}
+
+.seller-create__field input,
+.seller-create__field textarea {
+  width: 100%;
+  padding: 14px 15px;
+  border: 1px solid #dedbd3;
+  border-radius: 0;
+  background: #fdfcf9;
+  color: #202521;
+  font: inherit;
+  font-weight: 400;
+  font-size: 14px;
+  outline: none;
+}
+
+/* Kullanici bir input'a tikladiginda kenarligi belirginlesir. */
+.seller-create__field input:focus,
+.seller-create__field textarea:focus {
+  border-color: #202521;
+}
+
+/* Aciklama kutusu iki sutunun tamamini kaplar. */
+.seller-create__field--wide {
+  grid-column: 1 / -1;
+}
+
+.seller-create__field textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.seller-create__submit {
+  margin-top: 25px;
+  padding: 15px 25px;
+  background: #202521;
+  border: 1px solid #202521;
+  color: #fffefa;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.seller-create__submit:hover:not(:disabled) {
+  background: #3b453c;
+}
+
+/* Kayit devam ederken butona tekrar basilmasin. */
+.seller-create__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.seller-create__message {
+  margin-top: 20px;
+  padding: 13px 15px;
+  background: #f0f0e9;
+  color: #485047;
+  font-size: 13px;
+}
+
+/* Mobil ekranda alanlari tek sutuna indiriyoruz. */
+@media (max-width: 700px) {
+  .seller-create {
+    padding: 22px;
+  }
+
+  .seller-create__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .seller-create__field--wide {
+    grid-column: auto;
+  }
+}

@@ -1,6 +1,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
+import AuthPage from './components/AuthPage'
+import SellerDashboard from './components/SellerDashboard'
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
@@ -13,7 +15,10 @@ const formatPrice = (value) =>
   })
 
 function productIdFromPath() {
-  const match = window.location.pathname.match(/^\/products\/([1-9]\d*)\/?$/)
+  const match = window.location.pathname.match(
+    /^\/products\/([1-9]\d*)\/?$/
+  )
+
   return match ? Number(match[1]) : null
 }
 
@@ -24,7 +29,6 @@ function ProductImage({ product, priority = false }) {
     <div className="case-image">
       {product?.image_url && !failed ? (
         <img
-          key={product.image_url}
           src={product.image_url}
           alt={product.name}
           loading={priority ? 'eager' : 'lazy'}
@@ -48,7 +52,9 @@ function readSavedCart() {
       localStorage.getItem('casemarket-cart-v1') || '[]'
     )
 
-    if (!Array.isArray(saved)) return []
+    if (!Array.isArray(saved)) {
+      return []
+    }
 
     return saved.filter(
       (item) =>
@@ -64,28 +70,94 @@ function readSavedCart() {
 }
 
 function App() {
+  // KATALOG
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
 
+  // URUN DETAYI
   const [selectedId, setSelectedId] = useState(productIdFromPath)
   const [detail, setDetail] = useState(null)
-  const [detailLoading, setDetailLoading] = useState(
-    () => productIdFromPath() !== null
-  )
+  const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
 
+  // ARAMA VE FILTRELER
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
 
+  // SEPET
   const [cart, setCart] = useState(readSavedCart)
   const [cartOpen, setCartOpen] = useState(false)
 
-  // Katalog urunlerini backend'den getir.
+  // GIRIS VE KAYIT
+  const [authMode, setAuthMode] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
+
+  const [accessToken, setAccessToken] = useState(
+    () => sessionStorage.getItem('casemarket-token')
+  )
+
+  // SATICI PANELI
+  const [sellerPanelOpen, setSellerPanelOpen] = useState(false)
+
+  // OTURUM KONTROLU
+  useEffect(() => {
+    if (!accessToken) {
+      setCurrentUser(null)
+      return
+    }
+
+    const controller = new AbortController()
+
+    async function checkSession() {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/auth/me`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+            signal: controller.signal,
+          }
+        )
+
+        if (response.status === 401) {
+          sessionStorage.removeItem('casemarket-token')
+          setAccessToken(null)
+          setCurrentUser(null)
+          setSellerPanelOpen(false)
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error('Oturum doğrulanamadı.')
+        }
+
+        const user = await response.json()
+
+        if (!controller.signal.aborted) {
+          setCurrentUser(user)
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Oturum kontrol hatası:', err)
+        }
+      }
+    }
+
+    checkSession()
+
+    return () => controller.abort()
+  }, [accessToken])
+
+  // URUN KATALOGUNU GETIR
   useEffect(() => {
     const controller = new AbortController()
+
+    setLoading(true)
+    setError('')
 
     fetch(`${API_BASE_URL}/api/catalog/products`, {
       signal: controller.signal,
@@ -120,15 +192,23 @@ function App() {
     return () => controller.abort()
   }, [reloadKey])
 
-  // Urun detaylarini backend'den getir.
+  // URUN DETAYINI GETIR
   useEffect(() => {
-    if (selectedId === null) return
+    if (selectedId === null) {
+      setDetail(null)
+      return
+    }
 
     const controller = new AbortController()
 
-    fetch(`${API_BASE_URL}/api/catalog/products/${selectedId}`, {
-      signal: controller.signal,
-    })
+    setDetail(null)
+    setDetailLoading(true)
+    setDetailError('')
+
+    fetch(
+      `${API_BASE_URL}/api/catalog/products/${selectedId}`,
+      { signal: controller.signal }
+    )
       .then((response) => {
         if (response.status === 404) {
           throw new Error(
@@ -142,7 +222,11 @@ function App() {
 
         return response.json()
       })
-      .then((data) => setDetail(data))
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setDetail(data)
+        }
+      })
       .catch((err) => {
         if (err.name !== 'AbortError') {
           setDetailError(err.message)
@@ -157,15 +241,13 @@ function App() {
     return () => controller.abort()
   }, [selectedId])
 
-  // Tarayicinin geri ve ileri tuslarini destekle.
+  // TARAYICI GERI / ILERI TUSLARI
   useEffect(() => {
-    const handleHistory = () => {
-      const nextId = productIdFromPath()
-
-      setSelectedId(nextId)
+    function handleHistory() {
+      setSelectedId(productIdFromPath())
+      setAuthMode(null)
+      setSellerPanelOpen(false)
       setDetail(null)
-      setDetailLoading(nextId !== null)
-      setDetailError('')
       setCartOpen(false)
       window.scrollTo(0, 0)
     }
@@ -177,22 +259,26 @@ function App() {
     }
   }, [])
 
+  // KOLEKSIYONA DONUS
   useEffect(() => {
     if (
       selectedId === null &&
+      !sellerPanelOpen &&
+      !authMode &&
       window.location.hash === '#koleksiyon'
     ) {
       document.getElementById('koleksiyon')?.scrollIntoView()
     }
-  }, [selectedId])
+  }, [selectedId, sellerPanelOpen, authMode])
 
+  // SAYFA BASLIGI
   useEffect(() => {
     document.title = detail?.name
       ? `${detail.name} | CaseMarket`
       : 'CaseMarket | Premium Telefon Kılıfları'
   }, [detail])
 
-  // Sepeti tarayicida sakla.
+  // SEPETI KAYDET
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -200,15 +286,15 @@ function App() {
         JSON.stringify(cart)
       )
     } catch {
-      // Tarayici depolamayi engelliyorsa uygulama calismaya devam eder.
+      // Depolama kapaliysa uygulama calismaya devam eder.
     }
   }, [cart])
 
-  // Sepet acikken ESC ile kapat.
+  // ESC ILE SEPETI KAPAT
   useEffect(() => {
     if (!cartOpen) return undefined
 
-    const closeOnEscape = (event) => {
+    function closeOnEscape(event) {
       if (event.key === 'Escape') {
         setCartOpen(false)
       }
@@ -223,7 +309,7 @@ function App() {
     }
   }, [cartOpen])
 
-  // Arama, filtreleme ve siralama.
+  // ARAMA, FILTRELEME VE SIRALAMA
   const visibleProducts = useMemo(() => {
     const text = search.trim().toLocaleLowerCase('tr-TR')
 
@@ -260,6 +346,7 @@ function App() {
     })
   }, [products, search, onlyAvailable, sortBy])
 
+  // SEPET HESAPLAMALARI
   const cartCount = cart.reduce(
     (sum, item) => sum + item.quantity,
     0
@@ -272,24 +359,29 @@ function App() {
     0
   )
 
+  // URUN DETAY SAYFASINI AC
   function openProduct(id) {
-    window.history.pushState({}, '', `/products/${id}`)
-    setSelectedId(id)
-    setDetail(null)
-    setDetailLoading(true)
-    setDetailError('')
+    setAuthMode(null)
+    setSellerPanelOpen(false)
     setCartOpen(false)
+
+    window.history.pushState({}, '', `/products/${id}`)
+
+    setSelectedId(id)
     window.scrollTo(0, 0)
   }
 
+  // ANA SAYFAYA DON
   function goHome(toCollection = false) {
+    setAuthMode(null)
+    setSellerPanelOpen(false)
+
     const url = toCollection ? '/#koleksiyon' : '/'
 
     window.history.pushState({}, '', url)
+
     setSelectedId(null)
     setDetail(null)
-    setDetailLoading(false)
-    setDetailError('')
 
     if (toCollection) {
       window.requestAnimationFrame(() => {
@@ -307,6 +399,54 @@ function App() {
     }
   }
 
+  // GIRIS VEYA KAYIT EKRANINI AC
+  function openAuth(mode = 'login') {
+    setAuthMode(mode)
+    setSellerPanelOpen(false)
+    setCartOpen(false)
+    window.scrollTo(0, 0)
+  }
+
+  // BASARILI GIRIS
+  function handleAuthenticated(token, user) {
+    sessionStorage.setItem('casemarket-token', token)
+
+    setAccessToken(token)
+    setCurrentUser(user)
+
+    goHome()
+  }
+
+  // CIKIS YAP
+  function handleLogout() {
+    sessionStorage.removeItem('casemarket-token')
+
+    setAccessToken(null)
+    setCurrentUser(null)
+    setSellerPanelOpen(false)
+
+    goHome()
+  }
+
+  // SATICI PANELINI AC
+  function openSellerPanel() {
+    if (
+      currentUser?.role !== 'seller' ||
+      !accessToken
+    ) {
+      return
+    }
+
+    setAuthMode(null)
+    setSelectedId(null)
+    setDetail(null)
+    setCartOpen(false)
+    setSellerPanelOpen(true)
+
+    window.scrollTo(0, 0)
+  }
+
+  // SEPETE URUN EKLE
   function addToCart(product) {
     if (Number(product.stock) < 1) return
 
@@ -343,6 +483,7 @@ function App() {
     setCartOpen(true)
   }
 
+  // SEPETTEKI URUN ADEDI
   function changeQuantity(productId, change) {
     setCart((current) =>
       current
@@ -368,9 +509,12 @@ function App() {
     )
   }
 
+  // SEPETTEN URUN CIKAR
   function removeFromCart(productId) {
     setCart((current) =>
-      current.filter((item) => item.id !== productId)
+      current.filter(
+        (item) => item.id !== productId
+      )
     )
   }
 
@@ -379,7 +523,7 @@ function App() {
   return (
     <div className="site">
 
-      {/* Ust duyuru */}
+      {/* UST DUYURU */}
       <div className="announcement">
         <span
           className="announcement__dot"
@@ -388,7 +532,7 @@ function App() {
         TARZININ DEVAMI · YENİ NESİL AKSESUAR PAZARYERİ
       </div>
 
-      {/* Ust menu */}
+      {/* UST MENU */}
       <header className="site-header">
 
         <a
@@ -430,6 +574,41 @@ function App() {
         </nav>
 
         <div className="header-actions">
+
+          {/* GIRIS, CIKIS VE SATICI PANELI */}
+          {currentUser ? (
+            <>
+              <span className="auth-welcome">
+                Merhaba, {currentUser.full_name}
+              </span>
+
+              {currentUser.role === 'seller' && (
+                <button
+                  type="button"
+                  className="auth-nav-button"
+                  onClick={openSellerPanel}
+                >
+                  Satıcı Paneli
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="auth-nav-button"
+                onClick={handleLogout}
+              >
+                Çıkış Yap
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="auth-nav-button"
+              onClick={() => openAuth('login')}
+            >
+              Giriş Yap
+            </button>
+          )}
 
           <a
             href="/#koleksiyon"
@@ -474,7 +653,26 @@ function App() {
 
       <main>
 
-        {selectedId !== null ? (
+        {/* GIRIS VE KAYIT EKRANI */}
+        {authMode ? (
+
+          <AuthPage
+            mode={authMode}
+            onModeChange={setAuthMode}
+            onAuthenticated={handleAuthenticated}
+          />
+
+        ) : sellerPanelOpen &&
+            currentUser?.role === 'seller' ? (
+
+          /* SATICI PANELI */
+          <SellerDashboard
+            token={accessToken}
+            user={currentUser}
+            onBack={() => goHome(true)}
+          />
+
+        ) : selectedId !== null ? (
 
           /* URUN DETAY SAYFASI */
           <section className="detail-page">
@@ -520,6 +718,7 @@ function App() {
               <div className="detail-layout">
 
                 <div className="detail-image-panel">
+
                   <ProductImage
                     key={detail.id}
                     product={detail}
@@ -529,6 +728,7 @@ function App() {
                   <span className="detail-image-panel__tag">
                     CASEMARKET SELECT
                   </span>
+
                 </div>
 
                 <div className="detail-content">
@@ -555,13 +755,11 @@ function App() {
                   </strong>
 
                   <p
-                    className={
-                      `availability ${
-                        Number(detail.stock) === 0
-                          ? 'availability--empty'
-                          : ''
-                      }`
-                    }
+                    className={`availability ${
+                      Number(detail.stock) === 0
+                        ? 'availability--empty'
+                        : ''
+                    }`}
                   >
                     <span className="availability__dot" />
 
@@ -589,9 +787,10 @@ function App() {
 
                   <div className="detail-note">
                     <span>◈</span>
+
                     <p>
-                      Özenle seçilmiş tasarımlar. Gösterilen
-                      fiyatlar demo amaçlıdır.
+                      Özenle seçilmiş tasarımlar.
+                      Gösterilen fiyatlar demo amaçlıdır.
                     </p>
                   </div>
 
@@ -605,6 +804,8 @@ function App() {
 
           /* ANA SAYFA */
           <>
+
+            {/* HERO */}
             <section className="hero">
 
               <div className="hero__copy">
@@ -648,6 +849,7 @@ function App() {
                 <div className="hero__orbit hero__orbit--inner" />
 
                 <div className="hero__feature">
+
                   {featuredProduct ? (
                     <ProductImage
                       key={featuredProduct.id}
@@ -659,6 +861,7 @@ function App() {
                       CM
                     </div>
                   )}
+
                 </div>
 
                 <div className="hero__side-label">
@@ -673,7 +876,7 @@ function App() {
               </div>
             </section>
 
-            {/* Ozellik seridi */}
+            {/* OZELLIK SERIDI */}
             <div
               className="value-strip"
               aria-label="CaseMarket özellikleri"
@@ -695,7 +898,7 @@ function App() {
               </span>
             </div>
 
-            {/* URUN KATALOGU */}
+            {/* KATALOG */}
             <section
               className="collection"
               id="koleksiyon"
@@ -704,6 +907,7 @@ function App() {
               <div className="section-heading">
 
                 <div>
+
                   <span className="overline">
                     <span className="overline__diamond">
                       ◆
@@ -719,6 +923,7 @@ function App() {
                     Yeni favorini bul.
                     Her tarz için bir detay.
                   </p>
+
                 </div>
 
                 <span className="section-heading__count">
@@ -727,7 +932,7 @@ function App() {
 
               </div>
 
-              {/* Arama ve filtreler */}
+              {/* ARAMA VE FILTRE */}
               <div className="catalog-toolbar">
 
                 <label className="catalog-search">
@@ -742,11 +947,7 @@ function App() {
                     strokeWidth="1.7"
                     strokeLinecap="round"
                   >
-                    <circle
-                      cx="11"
-                      cy="11"
-                      r="7"
-                    />
+                    <circle cx="11" cy="11" r="7" />
                     <path d="m16 16 5 5" />
                   </svg>
 
@@ -768,6 +969,7 @@ function App() {
                 <div className="catalog-toolbar__right">
 
                   <label className="stock-filter">
+
                     <input
                       type="checkbox"
                       checked={onlyAvailable}
@@ -775,7 +977,9 @@ function App() {
                         setOnlyAvailable(event.target.checked)
                       }
                     />
+
                     <span>Yalnızca stoktakiler</span>
+
                   </label>
 
                   <label className="sort-select">
@@ -793,23 +997,27 @@ function App() {
                       <option value="newest">
                         Yeniden eskiye
                       </option>
+
                       <option value="price-low">
                         Fiyat: Artan
                       </option>
+
                       <option value="price-high">
                         Fiyat: Azalan
                       </option>
+
                       <option value="name">
                         İsme göre A-Z
                       </option>
                     </select>
 
                   </label>
-                </div>
 
+                </div>
               </div>
 
               <div className="catalog-results">
+
                 <span>
                   {visibleProducts.length} ürün gösteriliyor
                 </span>
@@ -817,6 +1025,7 @@ function App() {
                 <span>
                   KAŞİFLERİN SEÇKİSİ — 2026
                 </span>
+
               </div>
 
               {loading && (
@@ -833,13 +1042,11 @@ function App() {
                   <p>{error}</p>
 
                   <button
-                    type="button"
                     className="button button--dark"
-                    onClick={() => {
-                      setLoading(true)
-                      setError('')
+                    type="button"
+                    onClick={() =>
                       setReloadKey((key) => key + 1)
-                    }}
+                    }
                   >
                     Tekrar dene
                   </button>
@@ -954,7 +1161,9 @@ function App() {
                           ? 'Stokta yok'
                           : 'Sepete ekle'}
                       </span>
+
                       <span aria-hidden="true">↗</span>
+
                     </button>
 
                   </article>
@@ -964,7 +1173,7 @@ function App() {
               </div>
             </section>
 
-            {/* Alt tanitim alani */}
+            {/* ALT TANITIM */}
             <section className="editorial">
 
               <div className="editorial__symbol">
@@ -990,6 +1199,7 @@ function App() {
               </button>
 
             </section>
+
           </>
         )}
 
@@ -1002,6 +1212,7 @@ function App() {
       >
 
         <div>
+
           <span className="site-footer__brand">
             CASE<span>MARKET</span>
           </span>
@@ -1010,6 +1221,7 @@ function App() {
             Günlük yaşamın estetiği,
             küçük detaylarda saklı.
           </p>
+
         </div>
 
         <div className="site-footer__right">
@@ -1028,6 +1240,7 @@ function App() {
           </a>
 
         </div>
+
       </footer>
 
       {/* SAGDAN ACILAN SEPET */}
@@ -1052,6 +1265,7 @@ function App() {
             <div className="cart-drawer__heading">
 
               <div>
+
                 <span className="overline">
                   CASEMARKET
                 </span>
@@ -1059,6 +1273,7 @@ function App() {
                 <h2>
                   Sepetim <span>({cartCount})</span>
                 </h2>
+
               </div>
 
               <button
@@ -1113,10 +1328,12 @@ function App() {
                     >
 
                       <div className="cart-item__image">
+
                         <ProductImage
                           key={item.id}
                           product={item}
                         />
+
                       </div>
 
                       <div className="cart-item__body">
@@ -1184,16 +1401,18 @@ function App() {
                 <div className="cart-drawer__summary">
 
                   <div className="cart-drawer__subtotal">
+
                     <span>Ara toplam</span>
 
                     <strong>
                       {formatPrice(cartTotalCents / 100)}
                     </strong>
+
                   </div>
 
                   <p>
-                    Sipariş ve ödeme adımı
-                    bir sonraki geliştirmede eklenecek.
+                    Sipariş ve ödeme adımı bir sonraki
+                    geliştirmede eklenecek.
                   </p>
 
                   <button
@@ -1206,11 +1425,14 @@ function App() {
                   </button>
 
                 </div>
+
               </>
             )}
 
           </aside>
+
         </div>
+
       )}
 
     </div>
