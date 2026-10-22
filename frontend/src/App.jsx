@@ -375,6 +375,8 @@ function App() {
   function goHome(toCollection = false) {
     setAuthMode(null)
     setSellerPanelOpen(false)
+    //ana sayfaya dönerken kataloğu backend'den yüklememiz greiyor
+    setReloadKey((previousValue)=>previousValue+1)
 
     const url = toCollection ? '/#koleksiyon' : '/'
 

@@ -26,6 +26,12 @@ class SellerProductCreate(BaseModel):
         default=None,
         gt=0
     )
+    # Ürün görselinin adresi. Görsel eklemek zorunlu değil
+
+    image_url: str |None =Field(
+        default=None,
+        max_length=500,
+    )
 
 
 
@@ -39,14 +45,23 @@ class SellerProductUpdate(BaseModel):
         decimal_places=2
     )
 
-    stock: int =Field(
+    stock: int | None =Field(
         default=None,
         ge=0
     )
 
+    #mevcut ürünün adresini güncellemek için
+    image_url: str | None = Field(
+        default=None,
+        max_length=500
+    )
+
     @model_validator(mode = "after")
     def check_fields(self):
-        if self.price is None and self.stock is None:
+        if (
+                self.price is None
+                and self.stock is None
+                and self.image_url is None):
             raise ValueError("Fiyat veya stok alanlarnadan en az biri eksik")
 
         return self

@@ -1,17 +1,13 @@
 
 import { useEffect, useState } from 'react'
 import './SellerDashboard.css'
+import './components.css'
+import SellerProductRow from './SellerProductRow.jsx'
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   'http://127.0.0.1:8000'
 ).replace(/\/$/, '')
-
-const formatPrice = (price) =>
-  Number(price).toLocaleString('tr-TR', {
-    style: 'currency',
-    currency: 'TRY',
-  })
 
 function SellerDashboard({ token, user, onBack }) {
   const [store, setStore] = useState(null)
@@ -106,6 +102,8 @@ function SellerDashboard({ token, user, onBack }) {
     const description = String(formData.get('description')).trim()
     const price = Number(formData.get('price'))
     const stock = Number(formData.get('stock'))
+    //formdan gelen görsel adresii oku
+    const image_url =String(formData.get('image_url')|| '').trim()
 
     /*
    * FRONTEND DOGRULAMASI
@@ -132,7 +130,7 @@ function SellerDashboard({ token, user, onBack }) {
 
     try{
       const response =await fetch(
-          `${API_BASE_URL}/api/seller/me/products`,{
+          `${API_BASE_URL}/api/sellers/me/products`,{
               method:'POST',
 
             headers: {
@@ -147,6 +145,7 @@ function SellerDashboard({ token, user, onBack }) {
               price:price,
               stock:stock,
               category_id:null,
+              image_url: image_url || null,
             }),
           }
       )
@@ -276,7 +275,7 @@ function SellerDashboard({ token, user, onBack }) {
             </div>
           </div>
 
-          //yeni ürün ekleme formu
+          {/*yeni ürün ekleme formu*/}
 
           <section className="seller-create">
             <div className="seller-create__heading">
@@ -286,13 +285,13 @@ function SellerDashboard({ token, user, onBack }) {
                 Ürün bilgilerini doldur
                 Kaydettiğinde Mağzana Yeni bir Ürün Eklenecek
               </p>
-            </div>,
+            </div>
 
             <form onSubmit={handleCreateProduct}>
               <div className="seller-create__grid">
                  {/* URUN ADI */}
                  <label className="seller-create__field">
-                   Ürün adı
+                   Ürün Adı
 
                    <input
                      type="text"
@@ -317,8 +316,9 @@ function SellerDashboard({ token, user, onBack }) {
                 </label>
 
                 {/*STOK MİKTARI*/}
-                <label className="seller-created__field">
+                <label className="seller-created__field" style={{display:'flex',flexDirection:'column',gap:'8px'}}>
                   Stok Adedi
+
                   <input
                   type="number"
                   name="stock"
@@ -340,6 +340,21 @@ function SellerDashboard({ token, user, onBack }) {
                     required
                   />
                 </label>
+
+                {/*Ürün Görseli*/}
+                <label className="seller-create__field seller-create__field--wide">
+                  Ürün Görseli
+
+                  <input
+                  type="text"
+                  name="image_url"
+                  placeholder="/products/case-001.webp"
+                      maxLength={500}
+                  />
+
+                </label>
+
+
               </div>
             {/* BACKEND'DEN GELEN SONUCU GOSTER */}
               {createMessage &&(
@@ -392,39 +407,20 @@ function SellerDashboard({ token, user, onBack }) {
                       <th>Fiyat</th>
                       <th>Stok</th>
                       <th>Durum</th>
+                      <th>İşlemler</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {products.map((product) => (
-                      <tr key={product.id}>
-                        <td>
-                          <strong>{product.name}</strong>
-                          <small>
-                            Ürün #{product.id}
-                          </small>
-                        </td>
-
-                        <td>
-                          {formatPrice(product.price)}
-                        </td>
-
-                        <td>{product.stock}</td>
-
-                        <td>
-                          <span
-                            className={
-                              product.is_active
-                                ? 'seller-status seller-status--active'
-                                : 'seller-status seller-status--inactive'
-                            }
-                          >
-                            {product.is_active
-                              ? 'Yayında'
-                              : 'Pasif'}
-                          </span>
-                        </td>
-                      </tr>
+                      <SellerProductRow
+                        key={product.id}
+                        product={product}
+                        token={token}
+                        onUpdated={() =>
+                          setRefreshKey((value) => value + 1)
+                        }
+                      />
                     ))}
                   </tbody>
                 </table>

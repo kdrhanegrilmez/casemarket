@@ -40,6 +40,9 @@ def create_my_product(
         else None
     )
 
+    #Boş görsel adresini veritabanında NULL olarak sakla
+    image_url = data.image_url.strip() if data.image_url else None
+
     with get_connection() as connection:
         with connection.cursor() as cursor:
 
@@ -81,26 +84,27 @@ def create_my_product(
                     )
 
             # Urunu gercek products tablosuna kaydet.
+
+            # Ürünü görsel adresiyle birlikte products tablosuna kaydet.
             cursor.execute(
                 """
                 INSERT INTO products
-                    (
-                        seller_id,
-                        category_id,
-                        name,
-                        description,
-                        price,
-                        stock
-                    )
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING
+                (seller_id,
+                 category_id,
+                 name,
+                 description,
+                 price,
+                 stock,
+                 image_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING
                     id,
                     seller_id,
                     category_id,
                     name,
                     description,
                     price,
-                    stock
+                    stock,
+                    image_url
                 """,
                 (
                     seller_id,
@@ -109,6 +113,7 @@ def create_my_product(
                     description,
                     data.price,
                     data.stock,
+                    image_url,
                 ),
             )
 
@@ -122,6 +127,7 @@ def create_my_product(
         "description": product[4],
         "price": str(product[5]),
         "stock": product[6],
+        "image_url": product[7],
     }
 
 
@@ -149,7 +155,8 @@ def get_my_products(
                     p.stock,
                     p.category_id,
                     p.is_active,
-                    s.store_name
+                    s.store_name,
+                    p.image_url
                 FROM products AS p
                 JOIN sellers AS s
                     ON p.seller_id = s.id
@@ -172,6 +179,7 @@ def get_my_products(
             "category_id": row[4],
             "is_active": row[5],
             "store_name": row[6],
+            "image_url": row[7],
         })
 
     return products
@@ -195,26 +203,30 @@ def update_my_product(
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
+            # COALESCE: Fiyat, stok ve görsel adresini güncelle.
+            #Yeni görsel adresi gönderilirse → onu kaydet.
+            #None gönderilirse → eski görsel adresini koru.
             cursor.execute(
                 """
                 UPDATE products AS p
-                SET
-                    price = COALESCE(%s, p.price),
-                    stock = COALESCE(%s, p.stock)
-                FROM sellers AS s
+                SET price     = COALESCE(%s, p.price),
+                    stock     = COALESCE(%s, p.stock),
+                    image_url = COALESCE(%s, p.image_url) FROM sellers AS s
                 WHERE
                     p.id = %s
-                    AND p.seller_id = s.id
-                    AND s.owner_user_id = %s
-                RETURNING
-                    p.id,
-                    p.name,
-                    p.price,
-                    p.stock
+                  AND p.seller_id = s.id
+                  AND s.owner_user_id = %s
+                    RETURNING
+                    p.id
+                    , p.name
+                    , p.price
+                    , p.stock
+                    , p.image_url
                 """,
                 (
                     data.price,
                     data.stock,
+                    data.image_url,
                     product_id,
                     current_user["id"],
                 ),
@@ -234,6 +246,7 @@ def update_my_product(
         "name": product[1],
         "price": str(product[2]),
         "stock": product[3],
+        "image_url": product[4],
     }
 
 

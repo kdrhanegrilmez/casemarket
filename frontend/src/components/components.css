@@ -1,0 +1,58 @@
+
+/* Urun tablosundaki duzenleme alanlari */
+
+.seller-edit-input {
+  width: 115px;
+  padding: 10px;
+  border: 1px solid #d9d6cd;
+  background: #fffefa;
+  color: #202521;
+  font-size: 13px;
+}
+
+.seller-edit-input:focus {
+  outline: 1px solid #202521;
+}
+
+.seller-row-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.seller-row-button {
+  padding: 9px 12px;
+  border: 1px solid #d9d6cd;
+  background: transparent;
+  color: #202521;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.seller-row-button:hover:not(:disabled) {
+  background: #f0eee8;
+}
+
+.seller-row-button--primary {
+  background: #202521;
+  border-color: #202521;
+  color: white;
+}
+
+.seller-row-button--primary:hover:not(:disabled) {
+  background: #465047;
+}
+
+.seller-row-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.seller-row-error {
+  display: block;
+  max-width: 250px;
+  margin-top: 8px;
+  color: #a04436 !important;
+  white-space: normal;
+}
