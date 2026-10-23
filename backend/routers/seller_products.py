@@ -201,6 +201,15 @@ def update_my_product(
             detail="Bu islemi gerceklestirebilmek icin satici hesabi gerekir.",
         )
 
+    #Daha önceden ürün adı gönderilmişse, bosluklarini temizle.
+    name=data.name.strip() if data.name is not None else None
+
+    if name is not None and len(name)<3:
+        raise HTTPException(
+            status_code=422,
+            detail="Ürün adı en az 3 karakterden oluşmak zorudadır"
+        )
+
     with get_connection() as connection:
         with connection.cursor() as cursor:
             # COALESCE: Fiyat, stok ve görsel adresini güncelle.
@@ -209,7 +218,9 @@ def update_my_product(
             cursor.execute(
                 """
                 UPDATE products AS p
-                SET price     = COALESCE(%s, p.price),
+                SET 
+                     name      = COALESCE(%s,p.name),
+                    price     = COALESCE(%s, p.price),
                     stock     = COALESCE(%s, p.stock),
                     image_url = COALESCE(%s, p.image_url) FROM sellers AS s
                 WHERE
@@ -224,6 +235,7 @@ def update_my_product(
                     , p.image_url
                 """,
                 (
+                    name,
                     data.price,
                     data.stock,
                     data.image_url,

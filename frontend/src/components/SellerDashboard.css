@@ -399,3 +399,35 @@
     grid-column: auto;
   }
 }
+
+
+/* Urun duzenleme ekranindaki gorsel adresi */
+.seller-row-image-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 11px;
+  color: #62675e;
+}
+
+.seller-row-image-field input {
+  width: 240px;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid #d9d6cd;
+  background: #fffefa;
+  color: #202521;
+  font-size: 12px;
+}
+
+/* Urun adi duzenleme alani */
+.seller-edit-name {
+  width: 220px;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid #d9d6cd;
+  background: #fffefa;
+  color: #202521;
+  font-size: 13px;
+}

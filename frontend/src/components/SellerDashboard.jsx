@@ -348,7 +348,7 @@ function SellerDashboard({ token, user, onBack }) {
                   <input
                   type="text"
                   name="image_url"
-                  placeholder="/products/case-001.webp"
+                  placeholder="Ürün Görselinin Adresini Ekleyiniz"
                       maxLength={500}
                   />
 

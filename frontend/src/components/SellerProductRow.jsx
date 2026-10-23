@@ -21,6 +21,9 @@ function SellerProductRow({ product, token, onUpdated }) {
   // Inputlara yazilan fiyat ve stok degerleri.
   const [price, setPrice] = useState(String(product.price))
   const [stock, setStock] = useState(String(product.stock))
+  const [imageUrl,setImageUrl] = useState(String(product.image_url || ''))
+  const [name,setName] =useState(String(product.name))
+
 
   // API istegi devam ederken butonlari kilitleyecegiz.
   const [busy, setBusy] = useState(false)
@@ -45,14 +48,19 @@ function SellerProductRow({ product, token, onUpdated }) {
     setStock(String(product.stock))
     setError('')
     setEditing(true)
+    setName(product.name )
+    setImageUrl(product.image_url || '')
   }
 
   // Fiyat ve stok bilgilerini backend'e kaydet.
   async function saveProduct() {
     const newPrice = Number(price)
     const newStock = Number(stock)
+    const newImageUrl = imageUrl.trim()
+    const newName = name.trim()
 
     if (
+      name.length<3 ||
       price.trim() === '' ||
       stock.trim() === '' ||
       !Number.isFinite(newPrice) ||
@@ -79,6 +87,8 @@ function SellerProductRow({ product, token, onUpdated }) {
           body: JSON.stringify({
             price: newPrice,
             stock: newStock,
+            name: newName,
+            image_url: newImageUrl || null
           }),
         }
       )
@@ -145,8 +155,43 @@ function SellerProductRow({ product, token, onUpdated }) {
   return (
     <tr>
       <td>
-        <strong>{product.name}</strong>
+          {editing ?(
+              <input
+
+              className="seller-edit-name"
+              type="text"
+              value={name}
+              onChange={(event)=> setName(event.target.value)}
+              minLength={3}
+              maxLength={200}
+              aria-label="Ürün Adı"
+              placeholder="Yeni Ürün Adını Giriniz:"
+              />
+          ):( <strong>{product.name}</strong>) }
+
+
+
+
         <small>Ürün #{product.id}</small>
+
+         {/* Düzenle butonuna basılınca görsel alanını göster. */}
+          {editing && (
+              <label className='seller-row-image-field'>
+                  Görsel Adres
+
+                  <input
+                  type="text"
+                  value={imageUrl}
+                  onChange={(event)=>setImageUrl(event.target.value)}
+                  placeholder="görsel adresi"
+                  maxLength={500}
+
+                  />
+              </label>
+          )
+          }
+
+
 
         {error && (
           <small

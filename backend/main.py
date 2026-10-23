@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import catalog, login, me, products, register, seller
-from routers import seller_products
+from routers import seller_products, orders
 
 
 
@@ -34,3 +34,5 @@ app.include_router(me.router)
 app.include_router(seller.router)
 
 app.include_router(seller_products.router)
+
+app.include_router(orders.router)

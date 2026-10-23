@@ -56,11 +56,19 @@ class SellerProductUpdate(BaseModel):
         max_length=500
     )
 
+    #Satıcı mevcut ürününün adını değiştirebilmeli
+    name: str |None =Field(
+        default=None,
+        min_length=3,
+        max_length=150
+    )
+
     @model_validator(mode = "after")
     def check_fields(self):
         if (
                 self.price is None
                 and self.stock is None
+                and self.name is None
                 and self.image_url is None):
             raise ValueError("Fiyat veya stok alanlarnadan en az biri eksik")
 
