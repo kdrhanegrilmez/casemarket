@@ -177,3 +177,69 @@ def create_order(
     }
 
 
+
+#2 Giriş yapan Kullanıcının sipariş geçmişi
+
+
+# 2. GIRIS YAPAN KULLANICININ SIPARIS GECMISI
+
+@router.get("/mine")
+def get_my_orders(
+    current_user: dict = Depends(get_current_user),
+):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    o.id,
+                    o.total_amount,
+                    o.status,
+                    o.created_at,
+                    oi.product_id,
+                    oi.product_name,
+                    oi.quantity,
+                    oi.unit_price
+                FROM orders AS o
+                LEFT JOIN order_items AS oi
+                    ON oi.order_id = o.id
+                WHERE o.customer_id = %s
+                ORDER BY o.created_at DESC, o.id DESC, oi.id
+                """,
+                (current_user["id"],),
+            )
+
+            rows = cursor.fetchall()
+
+    orders = []
+    orders_by_id = {}
+
+    for row in rows:
+        order_id = row[0]
+
+        # Bir siparis birden fazla urun icerebilir.
+        # Her siparisi listede yalnizca bir kez olustur.
+        if order_id not in orders_by_id:
+            order = {
+                "id": order_id,
+                "total_amount": str(row[1]),
+                "status": row[2],
+                "created_at": row[3].isoformat(),
+                "items": [],
+            }
+
+            orders.append(order)
+            orders_by_id[order_id] = order
+
+        # Siparisin urunlerini kendi items listesine ekle.
+        if row[4] is not None:
+            orders_by_id[order_id]["items"].append({
+                "product_id": row[4],
+                "product_name": row[5],
+                "quantity": row[6],
+                "unit_price": str(row[7]),
+            })
+
+    return orders
+
+

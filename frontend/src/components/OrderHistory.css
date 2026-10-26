@@ -1,0 +1,167 @@
+
+/* MUSTERI SIPARIS GECMISI */
+
+.order-history {
+  width: min(1100px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 72px 0 110px;
+  color: #202521;
+}
+
+.order-history__heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 42px;
+}
+
+.order-history__heading h1 {
+  margin: 16px 0;
+  font-size: clamp(36px, 5vw, 58px);
+  font-weight: 500;
+  letter-spacing: -2px;
+}
+
+.order-history__heading p {
+  margin: 0;
+  color: #6b7069;
+  line-height: 1.7;
+}
+
+.order-history__list {
+  display: grid;
+  gap: 20px;
+}
+
+.order-history__card {
+  padding: 30px;
+  background: #fffefa;
+  border: 1px solid #e4e1d8;
+}
+
+.order-history__card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e4e1d8;
+}
+
+.order-history__number {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.order-history__date {
+  margin: 8px 0 0;
+  color: #777b74;
+  font-size: 13px;
+}
+
+.order-history__status {
+  padding: 9px 13px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  background: #f0eee6;
+  color: #655b43;
+}
+
+.order-history__status--paid {
+  background: #e8f0e8;
+  color: #305e3e;
+}
+
+.order-history__status--canceled {
+  background: #f4e8e6;
+  color: #88423a;
+}
+
+.order-history__items {
+  padding: 10px 0;
+}
+
+.order-history__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 0;
+}
+
+.order-history__item + .order-history__item {
+  border-top: 1px solid #f0eee7;
+}
+
+.order-history__item strong {
+  font-size: 14px;
+}
+
+.order-history__item p {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #777b74;
+}
+
+.order-history__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 22px;
+  border-top: 1px solid #e4e1d8;
+}
+
+.order-history__total span {
+  font-size: 13px;
+  color: #777b74;
+}
+
+.order-history__total strong {
+  font-size: 22px;
+}
+
+.order-history__empty {
+  padding: 65px 24px;
+  text-align: center;
+  border: 1px solid #e4e1d8;
+}
+
+.order-history__empty > span {
+  font-size: 42px;
+}
+
+.order-history__empty h2 {
+  font-weight: 500;
+}
+
+.order-history__empty p {
+  color: #777b74;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 650px) {
+  .order-history {
+    width: calc(100% - 32px);
+    padding: 45px 0 70px;
+  }
+
+  .order-history__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .order-history__card {
+    padding: 20px;
+  }
+
+  .order-history__item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+}

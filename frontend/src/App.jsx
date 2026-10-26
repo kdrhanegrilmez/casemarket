@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import AuthPage from './components/AuthPage'
 import SellerDashboard from './components/SellerDashboard'
+import {createOrder} from "./api/orders.js";
+import OrderHistory from './components/OrderHistory'
+
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
@@ -91,6 +94,12 @@ function App() {
   const [cart, setCart] = useState(readSavedCart)
   const [cartOpen, setCartOpen] = useState(false)
 
+  //SİPARAİŞ İŞLEMLERİ
+  const [ordering,setOrdering] = useState(false)
+  const[orderError, setOrderError] =useState('')
+  const [completeOrder, setCompleteOrder] =useState(null)
+
+
   // GIRIS VE KAYIT
   const [authMode, setAuthMode] = useState(null)
   const [currentUser, setCurrentUser] = useState(null)
@@ -101,6 +110,11 @@ function App() {
 
   // SATICI PANELI
   const [sellerPanelOpen, setSellerPanelOpen] = useState(false)
+
+  // MUSTERI SIPARIS GECMISI
+const [ordersOpen, setOrdersOpen] = useState(
+  () => window.location.pathname === '/orders'
+)
 
   // OTURUM KONTROLU
   useEffect(() => {
@@ -245,6 +259,7 @@ function App() {
   useEffect(() => {
     function handleHistory() {
       setSelectedId(productIdFromPath())
+      setOrdersOpen(window.location.pathname === '/orders')
       setAuthMode(null)
       setSellerPanelOpen(false)
       setDetail(null)
@@ -361,6 +376,7 @@ function App() {
 
   // URUN DETAY SAYFASINI AC
   function openProduct(id) {
+    setOrdersOpen(false)
     setAuthMode(null)
     setSellerPanelOpen(false)
     setCartOpen(false)
@@ -373,6 +389,7 @@ function App() {
 
   // ANA SAYFAYA DON
   function goHome(toCollection = false) {
+    setOrdersOpen(false)
     setAuthMode(null)
     setSellerPanelOpen(false)
     //ana sayfaya dönerken kataloğu backend'den yüklememiz greiyor
@@ -403,6 +420,7 @@ function App() {
 
   // GIRIS VEYA KAYIT EKRANINI AC
   function openAuth(mode = 'login') {
+    setOrdersOpen(false)
     setAuthMode(mode)
     setSellerPanelOpen(false)
     setCartOpen(false)
@@ -430,8 +448,10 @@ function App() {
     goHome()
   }
 
-  // SATICI PANELINI AC
+    // SATICI PANELINI AC
   function openSellerPanel() {
+    setOrdersOpen(false)
+
     if (
       currentUser?.role !== 'seller' ||
       !accessToken
@@ -448,9 +468,29 @@ function App() {
     window.scrollTo(0, 0)
   }
 
+  // SIPARISLERIM EKRANINI AC
+  function openOrders() {
+    if (!accessToken || !currentUser) {
+      openAuth('login')
+      return
+    }
+
+    setAuthMode(null)
+    setSellerPanelOpen(false)
+    setSelectedId(null)
+    setDetail(null)
+    setCartOpen(false)
+    setOrdersOpen(true)
+
+    window.history.pushState({}, '', '/orders')
+    window.scrollTo(0, 0)
+  }
+
   // SEPETE URUN EKLE
   function addToCart(product) {
     if (Number(product.stock) < 1) return
+    setCompleteOrder(null)
+    setOrderError('')
 
     setCart((current) => {
       const existing = current.find(
@@ -520,6 +560,54 @@ function App() {
     )
   }
 
+  //SEPETTEN SİPARİŞ OLUŞTURMA
+  async function handleCreateOrder(){
+
+    if (ordering ||cart.length===0) return
+
+    //GİRİŞ YAPILMAMIŞSA KULLANICI GİRİŞ EKRANINA DÖNMELİ
+    if (!accessToken){
+      openAuth('login')
+      return
+    }
+
+    setOrdering(true)
+    setOrderError('')
+    setCompleteOrder(null)
+
+
+    try{
+      //sepeti backendin beklediği forma dönüştür
+
+      const items = cart.map((item) =>({
+        //map methodu ile ssepetteki her üründen yeni bir nesne oluşturuluyor.
+        product_id: item.id,
+        quantity: item.quantity,
+      }))
+
+      const order = await createOrder(accessToken,items)
+
+      //sipariş başarılı ise sepeti temizle
+
+      setCart([])
+      setCompleteOrder(order)
+      setReloadKey((previous)=>previous+1)
+
+
+    }catch (err){
+      setOrderError(
+          err instanceof Error
+          ? err.message
+              :'Sipariş oluşturulamadı'
+      )
+    }finally {
+      setOrdering(false)
+    }
+
+
+
+  }
+
   const featuredProduct = products[0]
 
   return (
@@ -583,6 +671,14 @@ function App() {
               <span className="auth-welcome">
                 Merhaba, {currentUser.full_name}
               </span>
+
+              <button
+                    type="button"
+                    className="auth-nav-button"
+                     onClick={openOrders}
+              >
+                   Siparişlerim
+              </button>
 
               {currentUser.role === 'seller' && (
                 <button
@@ -655,14 +751,27 @@ function App() {
 
       <main>
 
-        {/* GIRIS VE KAYIT EKRANI */}
-        {authMode ? (
 
-          <AuthPage
-            mode={authMode}
-            onModeChange={setAuthMode}
-            onAuthenticated={handleAuthenticated}
-          />
+
+          {/* GIRIS VE KAYIT EKRANI */}
+          {authMode ? (
+
+            <AuthPage
+              mode={authMode}
+              onModeChange={setAuthMode}
+              onAuthenticated={handleAuthenticated}
+            />
+
+          ) : ordersOpen && currentUser && accessToken ? (
+
+            /* MUSTERI SIPARIS GECMISI */
+            <OrderHistory
+              token={accessToken}
+              onBack={() => goHome(true)}
+            />
+
+
+
 
         ) : sellerPanelOpen &&
             currentUser?.role === 'seller' ? (
@@ -1289,7 +1398,41 @@ function App() {
 
             </div>
 
-            {cart.length === 0 ? (
+
+{completeOrder ? (
+  <div className="cart-empty" role="status">
+    <span aria-hidden="true">✓</span>
+
+    <h3>Siparişin oluşturuldu!</h3>
+
+    <p>
+      #{completeOrder.id} numaralı siparişin
+      başarıyla kaydedildi.
+    </p>
+
+    <p>
+      Toplam: {formatPrice(completeOrder.total_amount)}
+    </p>
+
+    <p>
+      Sipariş durumu: Ödeme bekliyor.
+      Henüz gerçek ödeme alınmadı.
+    </p>
+
+    <button
+      type="button"
+      className="button button--dark"
+      onClick={() => {
+        setCompletedOrder(null)
+        setCartOpen(false)
+        goHome(true)
+      }}
+    >
+      Koleksiyona dön ↗
+    </button>
+  </div>
+) : cart.length === 0 ? (
+
 
               <div className="cart-empty">
 
@@ -1413,9 +1556,27 @@ function App() {
                   </div>
 
                   <p>
-                    Sipariş ve ödeme adımı bir sonraki
-                    geliştirmede eklenecek.
+                      Siparişiniz demo olarak oluşturulacaktır.
+                      Bu aşamada gerçek bir ödeme yapılmamaktadır.
                   </p>
+
+                  {orderError &&(
+                      <p className="status-message status-message--error" role="alert">
+                        {orderError}
+                      </p>
+                  )}
+
+                  <button
+                    type="buton"
+                    className="button button--dark"
+                    onClick={handleCreateOrder}
+                    disabled={ordering}
+                  >
+                    {ordering ? 'Siparişiniz oluşturuluyor...' : 'Siparişini oluştur'}
+                    <span aria-hidden="true"></span>
+                  </button>
+
+
 
                   <button
                     className="button button--dark"
