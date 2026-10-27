@@ -165,3 +165,17 @@
     gap: 10px;
   }
 }
+
+
+/* SIPARIS IPTAL BUTONU */
+
+.order-history__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.order-history__actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

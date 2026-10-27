@@ -243,3 +243,185 @@ def get_my_orders(
     return orders
 
 
+
+
+# 3. MUSTERININ BEKLEYEN SIPARISINI IPTAL ETMESI
+
+@router.post("/{order_id}/cancel")
+def cancel_my_order(
+    order_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    if order_id < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz sipariş numarası.",
+        )
+
+    with get_connection() as connection:
+        try:
+            with connection.cursor() as cursor:
+
+                # Siparisi kilitleyerek ayni anda iki kez
+                # iptal edilmesini engelliyoruz.
+                cursor.execute(
+                    """
+                    SELECT id, status
+                    FROM orders
+                    WHERE id = %s AND customer_id = %s
+                    FOR UPDATE
+                    """,
+                    (order_id, current_user["id"]),
+                )
+
+                order = cursor.fetchone()
+
+                if order is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Sipariş bulunamadı.",
+                    )
+
+                # Odeme beklemeyen siparis iptal edilemez.
+                if order[1] != "pending":
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Bu sipariş artık iptal edilemez.",
+                    )
+
+                # Siparisteki urunleri ve adetlerini getir.
+                cursor.execute(
+                    """
+                    SELECT product_id, SUM(quantity)
+                    FROM order_items
+                    WHERE order_id = %s
+                    GROUP BY product_id
+                    ORDER BY product_id
+                    """,
+                    (order_id,),
+                )
+
+                items = cursor.fetchall()
+
+                if not items:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Sipariş ürünleri bulunamadı.",
+                    )
+
+                # Iptal edilen urunleri stoga geri ekle.
+                for product_id, quantity in items:
+                    cursor.execute(
+                        """
+                        UPDATE products
+                        SET stock = stock + %s
+                        WHERE id = %s
+                        RETURNING id
+                        """,
+                        (quantity, product_id),
+                    )
+
+                    if cursor.fetchone() is None:
+                        raise HTTPException(
+                            status_code=409,
+                            detail="Ürün bulunamadığı için sipariş iptal edilemedi.",
+                        )
+
+                # Siparis durumunu iptal edildi olarak degistir.
+                cursor.execute(
+                    """
+                    UPDATE orders
+                    SET status = 'canceled'
+                    WHERE id = %s
+                    """,
+                    (order_id,),
+                )
+
+            # Tum islemler basariliysa kaydet.
+            connection.commit()
+
+        except Exception:
+            # Herhangi bir hata olursa degisiklikleri geri al.
+            connection.rollback()
+            raise
+
+    return {
+        "id": order_id,
+        "status": "canceled",
+        "message": "Sipariş iptal edildi. Stoklar geri yüklendi.",
+    }
+
+
+
+# 4. MUSTERININ DEMO ODEME YAPMASI
+
+@router.post("/{order_id}/pay-demo")
+def pay_demo_order(
+    order_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    if order_id < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz sipariş numarası.",
+        )
+
+    with get_connection() as connection:
+        try:
+            with connection.cursor() as cursor:
+
+                # Siparisi kilitle ve giris yapan
+                # kullaniciya ait oldugunu kontrol et.
+                cursor.execute(
+                    """
+                    SELECT id, status
+                    FROM orders
+                    WHERE id = %s AND customer_id = %s
+                    FOR UPDATE
+                    """,
+                    (order_id, current_user["id"]),
+                )
+
+                order = cursor.fetchone()
+
+                if order is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Sipariş bulunamadı.",
+                    )
+
+                # Yalnizca bekleyen siparisler odenebilir.
+                if order[1] != "pending":
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Bu sipariş için demo ödeme yapılamaz.",
+                    )
+
+                # Gercek odeme almiyoruz.
+                # Yalnizca siparis durumunu degistiriyoruz.
+                cursor.execute(
+                    """
+                    UPDATE orders
+                    SET status = 'paid'
+                    WHERE id = %s
+                    RETURNING id, status
+                    """,
+                    (order_id,),
+                )
+
+                paid_order = cursor.fetchone()
+
+            # Basarili islemleri veritabanina kaydet.
+            connection.commit()
+
+        except Exception:
+            # Hata olursa tum degisiklikleri geri al.
+            connection.rollback()
+            raise
+
+    return {
+        "id": paid_order[0],
+        "status": paid_order[1],
+        "message": "Demo ödeme başarılı. Gerçek ödeme alınmadı.",
+    }
+

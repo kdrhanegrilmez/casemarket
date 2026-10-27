@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from 'react'
-import { getMyOrders } from '../api/orders'
+import { getMyOrders, cancelOrder } from '../api/orders'
 import './OrderHistory.css'
 
 
@@ -37,6 +36,10 @@ function OrderHistory({ token, onBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
+
+  // SIPARIS IPTAL ISLEMLERI
+  const [cancellingId, setCancellingId] = useState(null)
+  const [cancelError, setCancelError] = useState('')
 
   // Sayfa acilinca backend'den siparisleri getir.
   useEffect(() => {
@@ -77,6 +80,38 @@ function OrderHistory({ token, onBack }) {
       active = false
     }
   }, [token, refreshKey])
+
+
+  // MUSTERININ SIPARISINI IPTAL ET
+  async function handleCancelOrder(orderId) {
+    if (cancellingId !== null) return
+
+    // Yanlislikla iptal edilmesini engelle.
+    const confirmed = window.confirm(
+      `#${orderId} numaralı siparişi iptal etmek istiyor musun?`
+    )
+
+    if (!confirmed) return
+
+    setCancellingId(orderId)
+    setCancelError('')
+
+    try {
+      // FastAPI'ye iptal istegi gonder.
+      await cancelOrder(token, orderId)
+
+      // Siparis listesini backend'den yeniden getir.
+      setRefreshKey((previous) => previous + 1)
+    } catch (err) {
+      setCancelError(
+        err instanceof Error
+          ? err.message
+          : 'Sipariş iptal edilemedi.'
+      )
+    } finally {
+      setCancellingId(null)
+    }
+  }
 
 
   return (
@@ -126,6 +161,15 @@ function OrderHistory({ token, onBack }) {
             Tekrar dene
           </button>
         </div>
+      )}
+
+      {cancelError && (
+        <p
+          className="status-message status-message--error"
+          role="alert"
+        >
+          {cancelError}
+        </p>
       )}
 
       {!loading && !error && orders.length === 0 && (
@@ -209,6 +253,22 @@ function OrderHistory({ token, onBack }) {
                   {formatPrice(order.total_amount)}
                 </strong>
               </div>
+
+              {/* YALNIZCA BEKLEYEN SIPARISLER IPTAL EDILEBILIR */}
+              {order.status === 'pending' && (
+                <div className="order-history__actions">
+                  <button
+                    type="button"
+                    className="button button--dark"
+                    disabled={cancellingId !== null}
+                    onClick={() => handleCancelOrder(order.id)}
+                  >
+                    {cancellingId === order.id
+                      ? 'İptal ediliyor...'
+                      : 'Siparişi İptal Et'}
+                  </button>
+                </div>
+              )}
 
             </article>
           ))}

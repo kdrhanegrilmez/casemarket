@@ -1423,7 +1423,7 @@ const [ordersOpen, setOrdersOpen] = useState(
       type="button"
       className="button button--dark"
       onClick={() => {
-        setCompletedOrder(null)
+        setCompleteOrder(null)
         setCartOpen(false)
         goHome(true)
       }}
@@ -1567,7 +1567,7 @@ const [ordersOpen, setOrdersOpen] = useState(
                   )}
 
                   <button
-                    type="buton"
+                    type="button"
                     className="button button--dark"
                     onClick={handleCreateOrder}
                     disabled={ordering}
