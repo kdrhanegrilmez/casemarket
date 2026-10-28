@@ -1,10 +1,12 @@
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import AuthPage from './components/AuthPage'
 import SellerDashboard from './components/SellerDashboard'
 import {createOrder} from "./api/orders.js";
-import OrderHistory from './components/OrderHistory'
+import AccountPage from './components/AccountPage'
+import { accountRequest } from './api/account'
+import SiteDialog from './components/SiteDialog'
 
 
 const API_BASE_URL = (
@@ -89,15 +91,26 @@ function App() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
+  const [featuredIndex, setFeaturedIndex] = useState(0)
+  const [featuredPaused, setFeaturedPaused] = useState(false)
+  const featuredRailRef = useRef(null)
 
   // SEPET
   const [cart, setCart] = useState(readSavedCart)
   const [cartOpen, setCartOpen] = useState(false)
+  const [resumeCartAfterAuth, setResumeCartAfterAuth] = useState(false)
+  const [checkoutAddresses, setCheckoutAddresses] = useState([])
+  const [checkoutMethods, setCheckoutMethods] = useState([])
+  const [selectedAddressId, setSelectedAddressId] = useState('')
+  const [selectedMethodId, setSelectedMethodId] = useState('')
+  const [accountTab, setAccountTab] = useState(() => window.location.pathname === '/orders' ? 'history' : 'profile')
 
   //SİPARAİŞ İŞLEMLERİ
   const [ordering,setOrdering] = useState(false)
   const[orderError, setOrderError] =useState('')
   const [completeOrder, setCompleteOrder] =useState(null)
+  // SIPARIS ICIN SITE ICI ONAY VE SONUC PENCERESI
+  const [checkoutDialog, setCheckoutDialog] = useState(null)
 
 
   // GIRIS VE KAYIT
@@ -113,8 +126,24 @@ function App() {
 
   // MUSTERI SIPARIS GECMISI
 const [ordersOpen, setOrdersOpen] = useState(
-  () => window.location.pathname === '/orders'
+  () => ['/orders', '/account'].includes(window.location.pathname)
 )
+
+  useEffect(() => {
+    if (!cartOpen || !accessToken) return undefined
+    let active = true
+    Promise.all([
+      accountRequest(accessToken, '/addresses'),
+      accountRequest(accessToken, '/payment-methods'),
+    ]).then(([addresses, methods]) => {
+      if (!active) return
+      setCheckoutAddresses(addresses)
+      setCheckoutMethods(methods)
+      setSelectedAddressId((id) => addresses.some((item) => String(item.id) === id) ? id : String(addresses[0]?.id || ''))
+      setSelectedMethodId((id) => methods.some((item) => String(item.id) === id) ? id : String(methods[0]?.id || ''))
+    }).catch((err) => { if (active) setOrderError(err.message) })
+    return () => { active = false }
+  }, [cartOpen, accessToken])
 
   // OTURUM KONTROLU
   useEffect(() => {
@@ -259,7 +288,8 @@ const [ordersOpen, setOrdersOpen] = useState(
   useEffect(() => {
     function handleHistory() {
       setSelectedId(productIdFromPath())
-      setOrdersOpen(window.location.pathname === '/orders')
+      setOrdersOpen(['/orders', '/account'].includes(window.location.pathname))
+      setAccountTab(window.location.pathname === '/orders' ? 'history' : 'profile')
       setAuthMode(null)
       setSellerPanelOpen(false)
       setDetail(null)
@@ -306,23 +336,25 @@ const [ordersOpen, setOrdersOpen] = useState(
   }, [cart])
 
   // ESC ILE SEPETI KAPAT
-  useEffect(() => {
-    if (!cartOpen) return undefined
+  // ESC ILE SEPETI KAPAT
+useEffect(() => {
+  if (!cartOpen) return undefined
 
-    function closeOnEscape(event) {
-      if (event.key === 'Escape') {
-        setCartOpen(false)
-      }
+  function closeOnEscape(event) {
+    // Onay penceresi acikken once o kapatilmali.
+    if (event.key === 'Escape' && checkoutDialog === null) {
+      setCartOpen(false)
     }
+  }
 
-    document.addEventListener('keydown', closeOnEscape)
-    document.body.style.overflow = 'hidden'
+  document.addEventListener('keydown', closeOnEscape)
+  document.body.style.overflow = 'hidden'
 
-    return () => {
-      document.removeEventListener('keydown', closeOnEscape)
-      document.body.style.overflow = ''
-    }
-  }, [cartOpen])
+  return () => {
+    document.removeEventListener('keydown', closeOnEscape)
+    document.body.style.overflow = ''
+  }
+}, [cartOpen, checkoutDialog])
 
   // ARAMA, FILTRELEME VE SIRALAMA
   const visibleProducts = useMemo(() => {
@@ -435,6 +467,10 @@ const [ordersOpen, setOrdersOpen] = useState(
     setCurrentUser(user)
 
     goHome()
+    if (resumeCartAfterAuth) {
+      setCartOpen(true)
+      setResumeCartAfterAuth(false)
+    }
   }
 
   // CIKIS YAP
@@ -443,6 +479,7 @@ const [ordersOpen, setOrdersOpen] = useState(
 
     setAccessToken(null)
     setCurrentUser(null)
+    setResumeCartAfterAuth(false)
     setSellerPanelOpen(false)
 
     goHome()
@@ -468,8 +505,8 @@ const [ordersOpen, setOrdersOpen] = useState(
     window.scrollTo(0, 0)
   }
 
-  // SIPARISLERIM EKRANINI AC
-  function openOrders() {
+  // HESAP EKRANINI AC
+  function openOrders(tab = 'profile') {
     if (!accessToken || !currentUser) {
       openAuth('login')
       return
@@ -480,9 +517,10 @@ const [ordersOpen, setOrdersOpen] = useState(
     setSelectedId(null)
     setDetail(null)
     setCartOpen(false)
+    setAccountTab(tab)
     setOrdersOpen(true)
 
-    window.history.pushState({}, '', '/orders')
+    window.history.pushState({}, '', '/account')
     window.scrollTo(0, 0)
   }
 
@@ -560,55 +598,123 @@ const [ordersOpen, setOrdersOpen] = useState(
     )
   }
 
-  //SEPETTEN SİPARİŞ OLUŞTURMA
-  async function handleCreateOrder(){
 
-    if (ordering ||cart.length===0) return
+  // SEPETI TEMIZLEMEK ICIN ONAY PENCERESI AC
+function requestClearCart() {
+  if (ordering || cart.length === 0) return
 
-    //GİRİŞ YAPILMAMIŞSA KULLANICI GİRİŞ EKRANINA DÖNMELİ
-    if (!accessToken){
-      openAuth('login')
-      return
-    }
-
-    setOrdering(true)
-    setOrderError('')
-    setCompleteOrder(null)
-
-
-    try{
-      //sepeti backendin beklediği forma dönüştür
-
-      const items = cart.map((item) =>({
-        //map methodu ile ssepetteki her üründen yeni bir nesne oluşturuluyor.
-        product_id: item.id,
-        quantity: item.quantity,
-      }))
-
-      const order = await createOrder(accessToken,items)
-
-      //sipariş başarılı ise sepeti temizle
-
-      setCart([])
-      setCompleteOrder(order)
-      setReloadKey((previous)=>previous+1)
+  setCheckoutDialog({
+    variant: 'confirm',
+    action: 'clear-cart',
+    title: 'Sepetini temizle',
+    message: `Sepetindeki ${cartCount} ürünü kaldırmak istiyor musun? Bu işlem oluşturulmuş siparişlerini etkilemez.`,
+    confirmText: 'Evet, sepeti temizle',
+    danger: true,
+  })
+}
 
 
-    }catch (err){
-      setOrderError(
-          err instanceof Error
-          ? err.message
-              :'Sipariş oluşturulamadı'
-      )
-    }finally {
-      setOrdering(false)
-    }
+  // SIPARISI ONAYLAMAK ICIN SITE ICI PENCERE AC
+function requestCreateOrder() {
+  if (ordering || cart.length === 0) return
 
-
-
+  if (!accessToken) {
+    setResumeCartAfterAuth(true)
+    openAuth('login')
+    return
   }
 
-  const featuredProduct = products[0]
+  if (!selectedAddressId || !selectedMethodId) {
+    setOrderError('Ödeme için Hesabım bölümüne adres ve demo kart bilgisi eklemelisin.')
+    return
+  }
+
+  setCheckoutDialog({
+    action: 'create-order',
+    variant: 'confirm',
+    title: 'Siparişini onayla',
+    message: `Sepetindeki ${cartCount} ürünü ${formatPrice(cartTotalCents / 100)} tutarla demo olarak ödemek istiyor musun? Gerçek para alınmaz.`,
+    confirmText: 'Demo ödemeyi tamamla',
+  })
+}
+
+
+
+//SEPETTEN SİPARİŞ OLUŞTURMA
+async function handleCreateOrder() {
+  if (ordering || cart.length === 0) return
+
+  // GİRİŞ YAPILMAMIŞSA KULLANICI GİRİŞ EKRANINA DÖNMELİ
+  if (!accessToken) {
+    setCheckoutDialog(null)
+    openAuth('login')
+    return
+  }
+
+  setOrdering(true)
+  setOrderError('')
+  setCompleteOrder(null)
+
+  try {
+    // Sepeti backend'in beklediği forma dönüştür.
+    const items = cart.map((item) => ({
+      // map() sepetteki her üründen yeni nesne oluşturur.
+      product_id: item.id,
+      quantity: item.quantity,
+    }))
+
+    // FastAPI'de siparişi oluştur.
+    const order = await createOrder(accessToken, items, Number(selectedAddressId), Number(selectedMethodId))
+
+    // Sipariş başarılı ise sepeti temizle.
+    setCart([])
+    setCompleteOrder(order)
+    setReloadKey((previous) => previous + 1)
+
+    // Tarayici alert'i yerine kendi mesajimizi goster.
+    setCheckoutDialog({
+      variant: 'success',
+      title: 'Siparişin oluşturuldu',
+      message: `#${order.id} numaralı siparişin demo ödemesi tamamlandı. Toplam: ${formatPrice(order.total_amount)}. Gerçek para alınmadı. Siparişini Hesabım bölümünden takip edebilirsin.`,
+    })
+  } catch (err) {
+    const message = err instanceof Error
+      ? err.message
+      : 'Sipariş oluşturulamadı.'
+
+    setOrderError(message)
+
+    setCheckoutDialog({
+      variant: 'error',
+      title: 'Sipariş oluşturulamadı',
+      message,
+    })
+  } finally {
+    setOrdering(false)
+  }
+}
+
+
+  const featuredProducts = products.slice(0, 8)
+  const featuredProduct = featuredProducts[featuredIndex % featuredProducts.length]
+
+  useEffect(() => {
+    if (featuredProducts.length < 2 || featuredPaused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setFeaturedIndex((index) => (index + 1) % featuredProducts.length)
+    }, 5500)
+    return () => window.clearInterval(timer)
+  }, [featuredProducts.length, featuredPaused])
+
+  function moveFeatured(direction) {
+    setFeaturedIndex((index) => (index + direction + featuredProducts.length) % featuredProducts.length)
+  }
+
+  function moveFeaturedRail(direction) {
+    const rail = featuredRailRef.current
+    if (!rail) return
+    rail.scrollBy({ left: direction * Math.max(rail.clientWidth * 0.8, 240), behavior: 'smooth' })
+  }
 
   return (
     <div className="site">
@@ -634,13 +740,11 @@ const [ordersOpen, setOrdersOpen] = useState(
           }}
           aria-label="CaseMarket ana sayfa"
         >
-          <span className="brand__mark">
-            C<span>M</span>
-          </span>
+          <img className="brand__mark" src="/casemarket-mark.svg" alt="" width="48" height="48" />
 
           <span className="brand__text">
             CASE<span>MARKET</span>
-            <small>STUDIO & ACCESSORIES</small>
+            <small>CASES · CHARACTER · CURATION</small>
           </span>
         </a>
 
@@ -675,28 +779,11 @@ const [ordersOpen, setOrdersOpen] = useState(
               <button
                     type="button"
                     className="auth-nav-button"
-                     onClick={openOrders}
+                     onClick={() => openOrders()}
               >
-                   Siparişlerim
+                   Hesabım
               </button>
 
-              {currentUser.role === 'seller' && (
-                <button
-                  type="button"
-                  className="auth-nav-button"
-                  onClick={openSellerPanel}
-                >
-                  Satıcı Paneli
-                </button>
-              )}
-
-              <button
-                type="button"
-                className="auth-nav-button"
-                onClick={handleLogout}
-              >
-                Çıkış Yap
-              </button>
             </>
           ) : (
             <button
@@ -723,6 +810,7 @@ const [ordersOpen, setOrdersOpen] = useState(
             className="cart-button"
             type="button"
             onClick={() => setCartOpen(true)}
+            aria-label={`Sepet, ${cartCount} ürün`}
           >
             <svg
               aria-hidden="true"
@@ -764,9 +852,14 @@ const [ordersOpen, setOrdersOpen] = useState(
 
           ) : ordersOpen && currentUser && accessToken ? (
 
-            /* MUSTERI SIPARIS GECMISI */
-            <OrderHistory
+            <AccountPage
+              key={accountTab}
               token={accessToken}
+              user={currentUser}
+              onUserChange={setCurrentUser}
+              onLogout={handleLogout}
+              onSellerOpen={openSellerPanel}
+              initialTab={accountTab}
               onBack={() => goHome(true)}
             />
 
@@ -780,7 +873,7 @@ const [ordersOpen, setOrdersOpen] = useState(
           <SellerDashboard
             token={accessToken}
             user={currentUser}
-            onBack={() => goHome(true)}
+            onBack={() => openOrders('seller')}
           />
 
         ) : selectedId !== null ? (
@@ -954,12 +1047,12 @@ const [ordersOpen, setOrdersOpen] = useState(
 
               </div>
 
-              <div className="hero__stage">
+              <div className="hero__stage" onMouseEnter={() => setFeaturedPaused(true)} onMouseLeave={() => setFeaturedPaused(false)} onFocusCapture={() => setFeaturedPaused(true)} onBlurCapture={() => setFeaturedPaused(false)}>
 
                 <div className="hero__orbit hero__orbit--outer" />
                 <div className="hero__orbit hero__orbit--inner" />
 
-                <div className="hero__feature">
+                <button className="hero__feature" type="button" disabled={!featuredProduct} onClick={() => featuredProduct && openProduct(featuredProduct.id)} aria-label={featuredProduct ? `${featuredProduct.name} ürününü incele` : 'Ürün yükleniyor'}>
 
                   {featuredProduct ? (
                     <ProductImage
@@ -973,16 +1066,27 @@ const [ordersOpen, setOrdersOpen] = useState(
                     </div>
                   )}
 
-                </div>
+                </button>
+
+                {featuredProduct && <div className="hero__product-caption" aria-live="off">
+                  <span>SEÇKİDEN BİR PARÇA</span>
+                  <strong>{featuredProduct.name}</strong>
+                  <span>{formatPrice(featuredProduct.price)}</span>
+                </div>}
 
                 <div className="hero__side-label">
                   THE EVERYDAY EDITION — CASEMARKET
                 </div>
 
                 <div className="hero__index">
-                  <strong>01</strong>
-                  <span>/ PREMIUM EDITION</span>
+                  <strong>{featuredProduct ? String(featuredIndex % featuredProducts.length + 1).padStart(2, '0') : '00'}</strong>
+                  <span>/ {String(featuredProducts.length).padStart(2, '0')} SEÇİLİ ÜRÜN</span>
                 </div>
+
+                {featuredProducts.length > 1 && <div className="hero__slider-controls" aria-label="Vitrin ürünleri">
+                  <button type="button" onClick={() => moveFeatured(-1)} aria-label="Önceki ürün">←</button>
+                  <button type="button" onClick={() => moveFeatured(1)} aria-label="Sonraki ürün">→</button>
+                </div>}
 
               </div>
             </section>
@@ -1008,6 +1112,23 @@ const [ordersOpen, setOrdersOpen] = useState(
                 03 <strong>ZAMANSIZ TASARIM</strong>
               </span>
             </div>
+
+            {featuredProducts.length > 0 && <section className="featured-showcase" aria-label="Öne çıkan ürünler">
+              <div className="featured-showcase__heading">
+                <div><span className="overline">CASEMARKET / VİTRİN</span><h2>Öne çıkan <em>tasarımlar.</em></h2>
+                  <p>Koleksiyondan seçilen parçaları kaydırarak keşfet.</p></div>
+                <div className="featured-showcase__controls">
+                  <button type="button" onClick={() => moveFeaturedRail(-1)} aria-label="Öne çıkan ürünlerde geri git">←</button>
+                  <button type="button" onClick={() => moveFeaturedRail(1)} aria-label="Öne çıkan ürünlerde ileri git">→</button>
+                </div>
+              </div>
+              <div className="featured-showcase__rail" ref={featuredRailRef} role="region" aria-label="Öne çıkan ürünler kaydırıcısı" tabIndex="0">
+                {featuredProducts.map((product, index) => <button className="featured-showcase__card" type="button" key={product.id} onClick={() => openProduct(product.id)}>
+                  <div className="featured-showcase__visual"><ProductImage product={product} /></div>
+                  <span className="featured-showcase__meta"><span>0{index + 1} / {product.store_name || 'CASEMARKET'}</span><strong>{product.name}</strong><span>{formatPrice(product.price)} <span aria-hidden="true">↗</span></span></span>
+                </button>)}
+              </div>
+            </section>}
 
             {/* KATALOG */}
             <section
@@ -1414,14 +1535,19 @@ const [ordersOpen, setOrdersOpen] = useState(
       Toplam: {formatPrice(completeOrder.total_amount)}
     </p>
 
-    <p>
-      Sipariş durumu: Ödeme bekliyor.
-      Henüz gerçek ödeme alınmadı.
-    </p>
+    <p>Sipariş durumu: Demo ödeme tamamlandı. Gerçek para alınmadı.</p>
 
     <button
       type="button"
       className="button button--dark"
+      onClick={() => openOrders('active')}
+    >
+      Siparişimi gör <span aria-hidden="true">↗</span>
+    </button>
+
+    <button
+      type="button"
+      className="cart-empty__secondary"
       onClick={() => {
         setCompleteOrder(null)
         setCartOpen(false)
@@ -1499,6 +1625,7 @@ const [ordersOpen, setOrdersOpen] = useState(
                             <button
                               type="button"
                               aria-label="Adedi azalt"
+                              disabled={ordering}
                               onClick={() =>
                                 changeQuantity(item.id, -1)
                               }
@@ -1512,7 +1639,7 @@ const [ordersOpen, setOrdersOpen] = useState(
                               type="button"
                               aria-label="Adedi artır"
                               disabled={
-                                item.quantity >= item.stock
+                                ordering || item.quantity >= item.stock
                               }
                               onClick={() =>
                                 changeQuantity(item.id, 1)
@@ -1523,14 +1650,16 @@ const [ordersOpen, setOrdersOpen] = useState(
 
                           </div>
 
+                          {/* SEPETTEN TEK URUN KALDIR */}
                           <button
                             type="button"
                             className="cart-item__remove"
-                            onClick={() =>
-                              removeFromCart(item.id)
-                            }
+                            aria-label={`${item.name} ürününü sepetten kaldır`}
+                            title="Sepetten kaldır"
+                            disabled={ordering}
+                            onClick={() => removeFromCart(item.id)}
                           >
-                            Kaldır
+                            ×
                           </button>
 
                         </div>
@@ -1555,10 +1684,25 @@ const [ordersOpen, setOrdersOpen] = useState(
 
                   </div>
 
-                  <p>
-                      Siparişiniz demo olarak oluşturulacaktır.
-                      Bu aşamada gerçek bir ödeme yapılmamaktadır.
-                  </p>
+                  <p>Ödeme demo olarak tamamlanır; gerçek para alınmaz.</p>
+
+                  {accessToken && <div className="cart-checkout-fields">
+                    <label>Teslimat adresi
+                      <select value={selectedAddressId} onChange={(event) => setSelectedAddressId(event.target.value)}>
+                        <option value="">Adres seç</option>
+                        {checkoutAddresses.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.district}/{item.city}</option>)}
+                      </select>
+                    </label>
+                    <label>Demo ödeme yöntemi
+                      <select value={selectedMethodId} onChange={(event) => setSelectedMethodId(event.target.value)}>
+                        <option value="">Demo kart seç</option>
+                        {checkoutMethods.map((item) => <option key={item.id} value={item.id}>{item.brand} ···· {item.last_four}</option>)}
+                      </select>
+                    </label>
+                    <button type="button" className="cart-checkout-fields__link" onClick={() => openOrders(!selectedAddressId ? 'addresses' : 'payments')}>
+                      Adres veya demo kart ekle ↗
+                    </button>
+                  </div>}
 
                   {orderError &&(
                       <p className="status-message status-message--error" role="alert">
@@ -1569,14 +1713,24 @@ const [ordersOpen, setOrdersOpen] = useState(
                   <button
                     type="button"
                     className="button button--dark"
-                    onClick={handleCreateOrder}
+                    onClick={requestCreateOrder}
                     disabled={ordering}
                   >
-                    {ordering ? 'Siparişiniz oluşturuluyor...' : 'Siparişini oluştur'}
+                    {ordering ? 'Ödeme tamamlanıyor...' : 'Demo ödeme ile sipariş ver'}
                     <span aria-hidden="true"></span>
                   </button>
 
 
+
+                  {/* TUM SEPETI TEMIZLE */}
+                  <button
+                    type="button"
+                    className="cart-clear-button"
+                    onClick={requestClearCart}
+                    disabled={ordering}
+                  >
+                    Sepeti Temizle
+                  </button>
 
                   <button
                     className="button button--dark"
@@ -1597,6 +1751,39 @@ const [ordersOpen, setOrdersOpen] = useState(
         </div>
 
       )}
+
+
+{/* SIPARIS ONAYI VE SONUC MESAJI */}
+<SiteDialog
+  open={checkoutDialog !== null}
+  variant={checkoutDialog?.variant}
+  title={checkoutDialog?.title}
+  message={checkoutDialog?.message}
+  confirmText={checkoutDialog?.confirmText}
+  busy={ordering}
+  danger={checkoutDialog?.danger}
+  onConfirm={() => {
+  // Tum sepeti temizleme onayi
+  if (checkoutDialog?.action === 'clear-cart') {
+    setCart([])
+    setCompleteOrder(null)
+    setOrderError('')
+    setCheckoutDialog(null)
+    return
+  }
+
+  // Yeni siparis olusturma onayi
+  if (checkoutDialog?.action === 'create-order') {
+    handleCreateOrder()
+  }
+}}
+  onClose={() => {
+    if (!ordering) {
+      setCheckoutDialog(null)
+    }
+  }}
+/>
+
 
     </div>
   )

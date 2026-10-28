@@ -131,6 +131,10 @@
   border: 1px solid #e4e1d8;
 }
 
+.order-history__details { margin-top: 16px; padding: 15px 18px; border-radius: 9px; background: #f7f5ef; }
+.order-history__details p { margin: 5px 0; color: #697067; font-size: 12px; line-height: 1.5; }
+.order-history__details strong { color: #30372f; }
+
 .order-history__empty > span {
   font-size: 42px;
 }
@@ -178,4 +182,67 @@
 .order-history__actions button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/*DEMO ODEME VE SİPARİŞ İPTAL BUTONLARI*/
+
+.order-history__actions{
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.order-history__heading {
+  padding: 32px;
+  background: linear-gradient(135deg, #eeece4, #f8f7f3 65%);
+  border: 1px solid #e4e1d8;
+  border-radius: 16px;
+}
+
+.order-history__heading h1 {
+  line-height: 1.1;
+}
+
+.order-history__card {
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(32, 37, 33, .045);
+  transition: box-shadow .2s, transform .2s;
+}
+
+.order-history__card:hover {
+  box-shadow: 0 16px 36px rgba(32, 37, 33, .08);
+  transform: translateY(-2px);
+}
+
+.order-history__status {
+  border-radius: 999px;
+}
+
+.order-history__actions .button {
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.order-history__actions .button:last-child {
+  background: transparent;
+  border-color: #d9d6cd;
+  color: #624a43;
+}
+
+.order-history__actions .button:last-child:hover:not(:disabled) {
+  background: #f4e8e6;
+}
+
+.order-history__empty {
+  border-radius: 14px;
+  background: #fffefa;
+}
+
+@media (max-width: 650px) {
+  .order-history__heading {
+    padding: 24px;
+  }
+
+  .order-history__actions .button {
+    width: 100%;
+  }
 }

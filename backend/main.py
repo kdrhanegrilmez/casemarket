@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import catalog, login, me, products, register, seller
-from routers import seller_products, orders
+from routers import seller_products, orders, account, checkout
 
 
 
@@ -15,7 +15,7 @@ app.add_middleware(
         "http://127.0.0.1:5173",
     ],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -36,3 +36,5 @@ app.include_router(seller.router)
 app.include_router(seller_products.router)
 
 app.include_router(orders.router)
+app.include_router(account.router)
+app.include_router(checkout.router)

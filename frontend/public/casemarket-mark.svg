@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" fill="none" role="img" aria-labelledby="title">
+  <title id="title">CaseMarket</title>
+  <rect width="72" height="72" rx="17" fill="#202923"/>
+  <rect x="15.5" y="12.5" width="41" height="47" rx="11" stroke="#D5C2A0" stroke-width="2"/>
+  <circle cx="25" cy="22" r="3.3" fill="#D5C2A0"/>
+  <path d="M50.5 23.5C48 18.8 43.2 16 37.5 16C27.1 16 20 24.1 20 36C20 47.8 27.1 56 37.5 56C43.2 56 48 53.2 50.5 48.5" stroke="#F8F5EC" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M30.5 43.5L37.5 48L44.5 43.5" stroke="#D5C2A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -196,6 +196,8 @@ def get_my_orders(
                     o.total_amount,
                     o.status,
                     o.created_at,
+                    o.shipping_address,
+                    o.payment_method_summary,
                     oi.product_id,
                     oi.product_name,
                     oi.quantity,
@@ -225,6 +227,8 @@ def get_my_orders(
                 "total_amount": str(row[1]),
                 "status": row[2],
                 "created_at": row[3].isoformat(),
+                "shipping_address": row[4],
+                "payment_method_summary": row[5],
                 "items": [],
             }
 
@@ -232,12 +236,12 @@ def get_my_orders(
             orders_by_id[order_id] = order
 
         # Siparisin urunlerini kendi items listesine ekle.
-        if row[4] is not None:
+        if row[6] is not None:
             orders_by_id[order_id]["items"].append({
-                "product_id": row[4],
-                "product_name": row[5],
-                "quantity": row[6],
-                "unit_price": str(row[7]),
+                "product_id": row[6],
+                "product_name": row[7],
+                "quantity": row[8],
+                "unit_price": str(row[9]),
             })
 
     return orders

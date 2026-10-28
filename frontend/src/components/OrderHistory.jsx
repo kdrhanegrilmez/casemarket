@@ -1,6 +1,8 @@
+
 import { useEffect, useState } from 'react'
 import { getMyOrders, cancelOrder } from '../api/orders'
 import './OrderHistory.css'
+import SiteDialog from './SiteDialog'
 
 
 // Fiyatlari Turk lirasi olarak goster.
@@ -23,14 +25,14 @@ const formatDate = (value) =>
 // Veritabanindaki siparis durumlarini Turkcelestir.
 function getStatusText(status) {
   if (status === 'pending') return 'Ödeme bekliyor'
-  if (status === 'paid') return 'Ödendi'
+  if (status === 'paid') return 'Demo ödeme tamamlandı'
   if (status === 'canceled') return 'İptal edildi'
 
   return status
 }
 
 
-function OrderHistory({ token, onBack }) {
+function OrderHistory({ token, onBack, filter = 'history' }) {
   // Musterinin siparislerini React state'inde tut.
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
@@ -39,7 +41,12 @@ function OrderHistory({ token, onBack }) {
 
   // SIPARIS IPTAL ISLEMLERI
   const [cancellingId, setCancellingId] = useState(null)
-  const [cancelError, setCancelError] = useState('')
+
+  // SITE ICI ONAY VE SONUC PENCERESI
+  const [dialog, setDialog] = useState(null)
+  const visibleOrders = filter === 'active'
+    ? orders.filter((order) => order.status !== 'canceled')
+    : orders
 
   // Sayfa acilinca backend'den siparisleri getir.
   useEffect(() => {
@@ -83,31 +90,48 @@ function OrderHistory({ token, onBack }) {
 
 
   // MUSTERININ SIPARISINI IPTAL ET
-  async function handleCancelOrder(orderId) {
+  function handleCancelOrder(orderId) {
     if (cancellingId !== null) return
 
     // Yanlislikla iptal edilmesini engelle.
-    const confirmed = window.confirm(
-      `#${orderId} numaralı siparişi iptal etmek istiyor musun?`
-    )
+    // Tarayici confirm penceresi yerine kendi penceremizi aciyoruz.
+    setDialog({
+      variant: 'confirm',
+      action: 'cancel',
+      orderId,
+      title: 'Siparişi iptal et',
+      message: `#${orderId} numaralı siparişi iptal etmek istiyor musun? Ürünler yeniden stoğa eklenecek.`,
+      confirmText: 'Evet, iptal et',
+      danger: true,
+    })
+  }
 
-    if (!confirmed) return
 
+  // Kullanici site icindeki pencereden onay verince API'yi cagir.
+  async function confirmOrderAction() {
+    if (!dialog || dialog.variant !== 'confirm') return
+    if (cancellingId !== null) return
+
+    const { orderId } = dialog
     setCancellingId(orderId)
-    setCancelError('')
 
     try {
-      // FastAPI'ye iptal istegi gonder.
       await cancelOrder(token, orderId)
 
       // Siparis listesini backend'den yeniden getir.
       setRefreshKey((previous) => previous + 1)
+
+      setDialog({
+        variant: 'success',
+        title: 'Sipariş iptal edildi',
+        message: `#${orderId} numaralı sipariş iptal edildi ve ürünlerin stoğu geri yüklendi.`,
+      })
     } catch (err) {
-      setCancelError(
-        err instanceof Error
-          ? err.message
-          : 'Sipariş iptal edilemedi.'
-      )
+      setDialog({
+        variant: 'error',
+        title: 'İşlem tamamlanamadı',
+        message: err instanceof Error ? err.message : 'Bir hata oluştu.',
+      })
     } finally {
       setCancellingId(null)
     }
@@ -123,11 +147,10 @@ function OrderHistory({ token, onBack }) {
             CASEMARKET / HESABIM
           </span>
 
-          <h1>Siparişlerim</h1>
+          <h1>{filter === 'active' ? 'Aktif siparişler' : 'Sipariş geçmişi'}</h1>
 
           <p>
-            Önceki siparişlerini ve güncel durumlarını
-            buradan takip edebilirsin.
+            {filter === 'active' ? 'İşlemdeki siparişlerini buradan takip edebilirsin.' : 'Tüm siparişlerini ve durumlarını burada görebilirsin.'}
           </p>
         </div>
 
@@ -163,20 +186,11 @@ function OrderHistory({ token, onBack }) {
         </div>
       )}
 
-      {cancelError && (
-        <p
-          className="status-message status-message--error"
-          role="alert"
-        >
-          {cancelError}
-        </p>
-      )}
-
-      {!loading && !error && orders.length === 0 && (
+      {!loading && !error && visibleOrders.length === 0 && (
         <div className="order-history__empty">
           <span aria-hidden="true">◇</span>
 
-          <h2>Henüz siparişin bulunmuyor.</h2>
+          <h2>{filter === 'active' ? 'Aktif siparişin bulunmuyor.' : 'Henüz siparişin bulunmuyor.'}</h2>
 
           <p>
             Koleksiyonumuzdaki telefon kılıflarını keşfederek
@@ -193,10 +207,10 @@ function OrderHistory({ token, onBack }) {
         </div>
       )}
 
-      {!loading && !error && orders.length > 0 && (
+      {!loading && !error && visibleOrders.length > 0 && (
         <div className="order-history__list">
 
-          {orders.map((order) => (
+          {visibleOrders.map((order) => (
             <article
               key={order.id}
               className="order-history__card"
@@ -253,6 +267,10 @@ function OrderHistory({ token, onBack }) {
                   {formatPrice(order.total_amount)}
                 </strong>
               </div>
+              {(order.shipping_address || order.payment_method_summary) && <div className="order-history__details">
+                {order.shipping_address && <p><strong>Teslimat:</strong> {order.shipping_address}</p>}
+                {order.payment_method_summary && <p><strong>Ödeme:</strong> {order.payment_method_summary}</p>}
+              </div>}
 
               {/* YALNIZCA BEKLEYEN SIPARISLER IPTAL EDILEBILIR */}
               {order.status === 'pending' && (
@@ -275,6 +293,21 @@ function OrderHistory({ token, onBack }) {
 
         </div>
       )}
+
+      {/* ORTAK SITE ICI BILDIRIM PENCERESI */}
+      <SiteDialog
+        open={dialog !== null}
+        variant={dialog?.variant}
+        title={dialog?.title}
+        message={dialog?.message}
+        confirmText={dialog?.confirmText}
+        danger={dialog?.danger}
+        busy={cancellingId !== null}
+        onConfirm={confirmOrderAction}
+        onClose={() => {
+          if (cancellingId === null) setDialog(null)
+        }}
+      />
 
     </section>
   )

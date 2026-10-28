@@ -1,0 +1,134 @@
+
+/* CASEMARKET / ORTAK SITE BILDIRIM PENCERESI */
+
+.cm-dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.cm-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgba(20, 25, 21, .68);
+  backdrop-filter: blur(5px);
+}
+
+.cm-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 460px);
+  padding: clamp(26px, 5vw, 42px);
+  background: #fffefa;
+  border: 1px solid #ded4c3;
+  color: #202521;
+  box-shadow: 0 25px 90px rgba(0, 0, 0, .28);
+  animation: cm-dialog-appear .22s ease-out;
+}
+
+.cm-dialog__eyebrow {
+  display: block;
+  color: #8a8377;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .23em;
+}
+
+.cm-dialog__symbol {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 28px 0 20px;
+  background: #202521;
+  color: #fffefa;
+  font-size: 26px;
+}
+
+.cm-dialog--success .cm-dialog__symbol {
+  background: #445c47;
+}
+
+.cm-dialog--error .cm-dialog__symbol {
+  background: #823f39;
+}
+
+.cm-dialog h2 {
+  margin: 0 0 14px;
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 550;
+  letter-spacing: -.04em;
+}
+
+.cm-dialog p {
+  margin: 0;
+  color: #626960;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.cm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.cm-dialog__actions button {
+  padding: 14px 19px;
+  border: 1px solid #202521;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cm-dialog__secondary {
+  background: transparent;
+  color: #202521;
+}
+
+.cm-dialog__primary {
+  background: #202521;
+  color: #fffefa;
+}
+
+.cm-dialog__primary--danger {
+  background: #823f39;
+  border-color: #823f39 !important;
+}
+
+.cm-dialog__actions button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+@keyframes cm-dialog-appear {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 430px) {
+  .cm-dialog__actions button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-dialog {
+    animation: none;
+  }
+}

@@ -4,14 +4,14 @@ const API_BASE_URL = (
 
 
 // 1. SEPETTEN YENI SIPARIS OLUSTUR
-export async function createOrder(token, items) {
-  const response = await fetch(`${API_BASE_URL}/api/orders`, {
+export async function createOrder(token, items, addressId, paymentMethodId) {
+  const response = await fetch(`${API_BASE_URL}/api/orders/checkout-demo`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items, address_id: addressId, payment_method_id: paymentMethodId }),
   })
 
   const data = await response.json().catch(() => ({}))
@@ -77,4 +77,31 @@ export async function cancelOrder(token, orderId) {
   }
 
   return data
+}
+
+
+//MÜŞTERİNİN DEMO ÖDEME YAPMASI
+
+export async function payDemoOrder(token, orderId){
+  const response =await fetch(`${API_BASE_URL}/api/orders/${orderId}/pay-demo`,
+      {
+        method:'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+  )
+
+  const data= await response.json().catch(()=>({}))
+  if (!response.ok){
+    const message =
+        typeof data.detail ==='string'
+            ? data.detail
+              :'Demo ödeme gerçekleştirilemedi.'
+
+
+    throw new Error(message)
+  }
+  return data
+
 }

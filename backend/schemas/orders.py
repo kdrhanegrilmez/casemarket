@@ -21,3 +21,5 @@ class OrderCreate(BaseModel):
         min_length=1,
         max_length=50,
     )
+    address_id: int | None = Field(default=None, gt=0)
+    payment_method_id: int | None = Field(default=None, gt=0)

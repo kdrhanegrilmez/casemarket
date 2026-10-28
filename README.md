@@ -4,7 +4,13 @@
 
 CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulamasıdır. Amaç; müşterilerin farklı mağazalardaki telefon kılıflarını keşfedebildiği, satıcıların kendi ürünlerini yönetebildiği ve ileride yöneticilerin siparişleri takip edebildiği bir pazaryeri oluşturmaktır.
 
-> **Proje durumu — 22 Ekim 2026:** Giriş/kayıt, ürün vitrini, sepet ve satıcı ürün yönetiminin temel akışları geliştirildi. Sipariş, admin paneli ve canlı destek henüz tamamlanmadı. Proje aktif geliştirme aşamasındadır.
+> **Proje durumu:** Giriş/kayıt, ürün vitrini, sepet, demo sipariş ve satıcı ürün yönetiminin temel akışları geliştirildi. Gerçek ödeme, kargo/teslimat takibi, admin paneli ve canlı destek henüz tamamlanmadı.
+
+### Hesap ve demo ödeme akışı
+
+- **Hesabım** ekranında profil bilgileri, teslimat adresleri, demo kartın yalnızca görünen bilgileri, aktif siparişler ve tüm sipariş geçmişi bulunur. Satıcı hesabında panel girişi de bu ekrandadır.
+- Sepette adres ve demo ödeme yöntemi seçilerek sipariş tamamlanır. Gerçek ödeme alınmaz; tam kart numarası ve güvenlik kodu saklanmaz. Canlı ödeme için ayrı bir ödeme sağlayıcısı entegrasyonu gerekir.
+- Mevcut PostgreSQL veritabanını kullanan kurulumlarda bir kez `cd backend && python -m scripts.apply_account_migration` çalıştırılmalıdır. Yeni kurulumlarda `backend/schema.sql` bu alanları içerir.
 
 ## Mevcut Özellikler
 
