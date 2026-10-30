@@ -278,3 +278,7 @@ Kaynaklar:
 ---
 
 **CaseMarket**, eğitim amaçlı geliştirilmeye devam eden bir üniversite projesidir.
+
+## Proje Yol Haritası
+
+Güncel geliştirme planı için [ROADMAP.md](ROADMAP.md) dosyasına bakın.

@@ -1,12 +1,12 @@
+
 from decimal import Decimal
-from statistics import quantiles
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from core.dependencies import get_current_user
 from database import get_connection
-from routers import seller
 from schemas.orders import OrderCreate
+
 
 router = APIRouter(
     prefix="/api/orders",
@@ -16,14 +16,13 @@ router = APIRouter(
 
 # 1. GIRIS YAPAN KULLANICININ SIPARIS OLUSTURMASI
 
-@router.post("",status_code=201)
+@router.post("", status_code=201)
 def create_order(
-    data:OrderCreate,
-    current_user: dict =Depends(get_current_user),
+    data: OrderCreate,
+    current_user: dict = Depends(get_current_user),
 ):
     # Ayni urun bir sipariste iki kez gonderilmesin.
-
-    product_ids =[item.product_id for item in data.items]
+    product_ids = [item.product_id for item in data.items]
 
     if len(product_ids) != len(set(product_ids)):
         raise HTTPException(
@@ -31,9 +30,10 @@ def create_order(
             detail="Ayni urunu sipariste birden fazla kez gondermeyin.",
         )
 
-    total_amount= Decimal("0.00")
-    order_products=[]
+    total_amount = Decimal("0.00")
+    order_products = []
 
+    # Psycopg 3: with blogu bitince commit/rollback ve close yapilir.
     with get_connection() as connection:
         with connection.cursor() as cursor:
 
@@ -42,6 +42,7 @@ def create_order(
                 data.items,
                 key=lambda item: item.product_id,
             ):
+                # FOR UPDATE urunu transaction bitene kadar kilitler.
                 cursor.execute(
                     """
                     SELECT
@@ -56,15 +57,16 @@ def create_order(
                     FOR UPDATE
                     """,
                     (item.product_id,),
-
                 )
-                product=cursor.fetchone()
+
+                product = cursor.fetchone()
 
                 if product is None:
                     raise HTTPException(
                         status_code=404,
-                        detail="Aradığınız ürün bulunmadı: {item.product_id}",
+                        detail=f"Aradığınız ürün bulunmadı: {item.product_id}",
                     )
+
                 (
                     product_id,
                     seller_id,
@@ -72,22 +74,21 @@ def create_order(
                     unit_price,
                     stock,
                     is_active,
-                )= product
+                ) = product
 
                 if not is_active:
                     raise HTTPException(
                         status_code=409,
-                        detail="Aradığınız ürün satış dışı: {product_name}",
+                        detail=f"Aradığınız ürün satış dışı: {product_name}",
                     )
 
-                if stock< item.quantity:
+                if stock < item.quantity:
                     raise HTTPException(
                         status_code=409,
-                        detail=f"Stoklar yetersiz: {product_name}"
+                        detail=f"Stoklar yetersiz: {product_name}",
                     )
 
                 #Fiyat frontend'den deil veritabanından gelmeli
-
                 total_amount += unit_price * item.quantity
 
                 order_products.append(
@@ -100,76 +101,84 @@ def create_order(
                     }
                 )
 
-                # orders.total_amount numeric(10,2) oldugu icin.
-                if total_amount > Decimal("99999999.99"):
-                    raise HTTPException(
-                        status_code=422,
-                        detail="Sipariş tutarı izin verilen sınırı aşıyor"
+            # Tum urunler kontrol edildi.
+            # Bundan sonraki kod ilk for dongusunun DISINDA.
 
-                    )
+            # orders.total_amount numeric(10,2) oldugu icin.
+            if total_amount > Decimal("99999999.99"):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Sipariş tutarı izin verilen sınırı aşıyor",
+                )
 
-                # Once siparisin ana kaydı oluşturulmalı.
+            # Once siparisin ana kaydı oluşturulmalı.
+            # Bu INSERT sadece BIR KEZ calisir.
+            cursor.execute(
+                """
+                INSERT INTO orders (
+                    customer_id,
+                    total_amount,
+                    status
+                )
+                VALUES (%s, %s, 'pending')
+                RETURNING id, status
+                """,
+                (
+                    current_user["id"],
+                    total_amount,
+                ),
+            )
+
+            order_id, order_status = cursor.fetchone()
+
+            # Her urunun stokunu azalt ve siparis satirini kaydet.
+            # Tum urunler ayni order_id altinda toplanir.
+            for item in order_products:
+                cursor.execute(
+                    """
+                    UPDATE products
+                    SET stock = stock - %s
+                    WHERE id = %s
+                    """,
+                    (
+                        item["quantity"],
+                        item["product_id"],
+                    ),
+                )
 
                 cursor.execute(
                     """
-                    INSERT INTO orders(
-                        customer_id,
-                        total_amount,
-                        status
-                    ) 
-                    VALUES (%s,%s,'pending')
-                        RETURNING id, status
+                    INSERT INTO order_items (
+                        order_id,
+                        product_id,
+                        seller_id,
+                        product_name,
+                        quantity,
+                        unit_price
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     """,
-                    (current_user["id"],
-                     total_amount,),
+                    (
+                        order_id,
+                        item["product_id"],
+                        item["seller_id"],
+                        item["product_name"],
+                        item["quantity"],
+                        item["unit_price"],
+                    ),
                 )
 
-                order_id, order_status = cursor.fetchone()
-
-                # Her urunun stokunu azalt ve siparis satirini kaydet.
-                for item in order_products:
-                    cursor.execute(
-                        """
-                        UPDATE products 
-                        SET stock=stock-%s 
-                        WHERE id=%s
-                        """,(
-                            item["quantity"],
-                            item["product_id"],
-                        ),
-                    )
-
-                    cursor.execute(
-                        """
-                                INSERT INTO order_items (
-                                       order_id,
-                                      product_id,
-                                      seller_id,
-                                     product_name,
-                                      quantity,
-                                      unit_price
-                                    )
-                                    VALUES (%s, %s, %s, %s, %s, %s)
-                        """,
-                        (
-                            order_id,
-                            item["product_id"],
-                            item["seller_id"],
-                            item["product_name"],
-                            item["quantity"],
-                            item["unit_price"],
-                        ),
-                    )
-
+    # with blogundan cikildi:
+    # SQL islemleri basariliysa COMMIT, sonra CLOSE yapildi.
     return {
-        "id":order_id,
-        "status":order_status,
-        "total_amount":str(total_amount),
-        "items":[
+        "id": order_id,
+        "status": order_status,
+        "total_amount": str(total_amount),
+        "items": [
             {
-                "product_id":item["product_id"],
-                "product_name":item["product_name"],
-                "quantity":item["quantity"],
+                "product_id": item["product_id"],
+                "product_name": item["product_name"],
+                "quantity": item["quantity"],
                 "unit_price": str(item["unit_price"]),
             }
             for item in order_products
@@ -177,9 +186,7 @@ def create_order(
     }
 
 
-
 #2 Giriş yapan Kullanıcının sipariş geçmişi
-
 
 # 2. GIRIS YAPAN KULLANICININ SIPARIS GECMISI
 
@@ -237,16 +244,16 @@ def get_my_orders(
 
         # Siparisin urunlerini kendi items listesine ekle.
         if row[6] is not None:
-            orders_by_id[order_id]["items"].append({
-                "product_id": row[6],
-                "product_name": row[7],
-                "quantity": row[8],
-                "unit_price": str(row[9]),
-            })
+            orders_by_id[order_id]["items"].append(
+                {
+                    "product_id": row[6],
+                    "product_name": row[7],
+                    "quantity": row[8],
+                    "unit_price": str(row[9]),
+                }
+            )
 
     return orders
-
-
 
 
 # 3. MUSTERININ BEKLEYEN SIPARISINI IPTAL ETMESI
@@ -356,7 +363,6 @@ def cancel_my_order(
     }
 
 
-
 # 4. MUSTERININ DEMO ODEME YAPMASI
 
 @router.post("/{order_id}/pay-demo")
@@ -428,4 +434,3 @@ def pay_demo_order(
         "status": paid_order[1],
         "message": "Demo ödeme başarılı. Gerçek ödeme alınmadı.",
     }
-

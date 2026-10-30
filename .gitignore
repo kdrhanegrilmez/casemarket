@@ -8,3 +8,23 @@ __pycache__/
 !.env.example
 
 node_modules/
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+
+# Node.js
+node_modules/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local backups
+App.jwt-yedek.jsx
+
+# IDE
+.idea/

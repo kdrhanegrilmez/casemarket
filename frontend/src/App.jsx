@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import AuthPage from './components/AuthPage'
 import SellerDashboard from './components/SellerDashboard'
@@ -74,6 +74,37 @@ function readSavedCart() {
   }
 }
 
+
+
+// JWT ICINDEKI BITIS ZAMANINI MILISANIYE OLARAK OKU
+function getJwtExpirationMs(token) {
+  try {
+    const payloadPart = token.split('.')[1]
+
+    const base64 = payloadPart
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+
+    const payload = JSON.parse(window.atob(base64))
+
+    if (!Number.isFinite(payload.exp)) {
+      return null
+    }
+
+    // JWT exp saniye cinsindendir.
+    // JavaScript Date.now() milisaniye kullanir.
+    return payload.exp * 1000
+  } catch {
+    return null
+  }
+}
+
+
+
+
+
+
+
 function App() {
   // KATALOG
   const [products, setProducts] = useState([])
@@ -129,6 +160,46 @@ const [ordersOpen, setOrdersOpen] = useState(
   () => ['/orders', '/account'].includes(window.location.pathname)
 )
 
+  // JWT SURESI DOLDUGUNDA KULLANICIYI OTOMATIK CIKAR
+  const expireSession = useCallback((expectedToken) => {
+
+    // Eski bir istek, yeni giris yapan kullaniciyi cikarmasin.
+    if (
+      sessionStorage.getItem('casemarket-token') !== expectedToken
+    ) {
+      return
+    }
+
+    // JWT TOKEN'I SIL
+    sessionStorage.removeItem('casemarket-token')
+
+    // REACT OTURUM BILGILERINI TEMIZLE
+    setAccessToken(null)
+    setCurrentUser(null)
+    setSellerPanelOpen(false)
+    setOrdersOpen(false)
+    setCartOpen(false)
+    setAuthMode(null)
+    setResumeCartAfterAuth(false)
+    setSelectedId(null)
+    setDetail(null)
+    setOrdering(false)
+
+    // KULLANICIYI ANA SAYFAYA DONDER
+    window.history.replaceState({}, '', '/')
+
+    // CASEMARKET'E OZEL BILDIRIM GOSTER
+    setCheckoutDialog({
+      variant: 'error',
+      action: 'session-expired',
+      title: 'Oturum süreniz doldu',
+      message:
+        'Güvenliğiniz için oturumunuz sonlandırıldı. ' +
+        'Devam etmek için yeniden giriş yapmanız gerekiyor.',
+    })
+
+  }, [])
+
   useEffect(() => {
     if (!cartOpen || !accessToken) return undefined
     let active = true
@@ -167,10 +238,10 @@ const [ordersOpen, setOrdersOpen] = useState(
         )
 
         if (response.status === 401) {
-          sessionStorage.removeItem('casemarket-token')
-          setAccessToken(null)
-          setCurrentUser(null)
-          setSellerPanelOpen(false)
+          if (!controller.signal.aborted) {
+            expireSession(accessToken)
+          }
+
           return
         }
 
@@ -193,7 +264,65 @@ const [ordersOpen, setOrdersOpen] = useState(
     checkSession()
 
     return () => controller.abort()
-  }, [accessToken])
+  }, [accessToken, expireSession])
+
+
+// JWT SURESI DOLUNCA SAYFA YENILENMEDEN CIKIS YAP
+useEffect(() => {
+  if (!accessToken) return undefined
+
+  const expiresAt = getJwtExpirationMs(accessToken)
+
+  // Token suresinin dolup dolmadigini kontrol et.
+  function checkExpiration() {
+    if (expiresAt === null || Date.now() >= expiresAt) {
+      expireSession(accessToken)
+    }
+  }
+
+  // Sayfa acildiginda token zaten bitmis olabilir.
+  checkExpiration()
+
+  if (expiresAt === null || Date.now() >= expiresAt) {
+    return undefined
+  }
+
+  // Kalan sure kadar bekle, sonra tekrar kontrol et.
+  const remainingMs = expiresAt - Date.now()
+
+  const timer = window.setTimeout(
+    checkExpiration,
+    remainingMs + 100
+  )
+
+  // Kullanici arka plandaki sekmeye geri donerse
+  // token suresini yeniden kontrol et.
+  document.addEventListener(
+    'visibilitychange',
+    checkExpiration
+  )
+
+  window.addEventListener('focus', checkExpiration)
+
+  // Token degisir veya component kapanirsa
+  // eski zamanlayiciyi temizle.
+  return () => {
+    window.clearTimeout(timer)
+
+    document.removeEventListener(
+      'visibilitychange',
+      checkExpiration
+    )
+
+    window.removeEventListener(
+      'focus',
+      checkExpiration
+    )
+  }
+}, [accessToken, expireSession])
+
+
+
 
   // URUN KATALOGUNU GETIR
   useEffect(() => {
@@ -1777,11 +1906,18 @@ async function handleCreateOrder() {
     handleCreateOrder()
   }
 }}
-  onClose={() => {
-    if (!ordering) {
-      setCheckoutDialog(null)
-    }
-  }}
+onClose={() => {
+  if (ordering) return
+
+  const sessionExpired =
+    checkoutDialog?.action === 'session-expired'
+
+  setCheckoutDialog(null)
+
+  if (sessionExpired) {
+    openAuth('login')
+  }
+}}
 />
 
 
