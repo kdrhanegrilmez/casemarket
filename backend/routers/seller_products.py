@@ -1,9 +1,15 @@
+from xxlimited_35 import Null
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from core.dependencies import get_current_user
 from database import get_connection
-from schemas.seller_products import (SellerProductCreate, SellerProductUpdate, SellerProductVisibilityUpdate)
+from schemas.seller_products import (
+    SellerProductCreate,
+    SellerProductUpdate,
+    SellerProductVisibilityUpdate,
+    SellerProductCompatibilityUpdate,
+)
 
 
 router = APIRouter(
@@ -313,3 +319,139 @@ def update_my_product_visibility(
         "name": product[1],
         "is_active": product[2],
     }
+
+
+
+
+# 5. SATICININ URUNUNU TELEFON MODELLERIYLE ESLESTIRMESI
+
+@router.patch("/{product_id}/compatibility")
+def update_product_compatibility(
+    product_id: int,
+    data: SellerProductCompatibilityUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+
+    #1. Yanlızca satıcı hesapları bu işlemleri yapabilir
+    if current_user["role"] != "seller":
+        raise HTTPException(
+            status_code=403,
+            detail="Bu işlem için satıcı hesabı gerekir.",
+        )
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+
+            #2. Ürün Giriş yapan Satıcıya mı ait
+            cursor.execute(
+                """
+                SELECT p.id
+                FROM products AS p 
+                JOIN sellers AS s 
+                    ON s.id = p.seller_id
+                WHERE 
+                    p.id = %s
+                    AND s.owner_user_id = %s
+                FOR UPDATE OF p    
+                """,
+                (product_id,current_user["id"],),
+            )
+            if cursor.fetchone() is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Urun bulunamadi ve bu urun size ait degil.",
+                )
+            #3. SEÇİLEN KILIF KATEGORİSİ VAR MI ?
+
+            cursor.execute(
+                """
+                SELECT id
+                FROM categories
+                WHERE id = %s
+                """,
+                (data.category_id,),
+            )
+
+            if cursor.fetchone() is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Seçilen Kılıf Kategorisi bulunamadı"
+                )
+
+            # 4. Seçilen telefon modelleri gerçekten var mı?
+            cursor.execute(
+                """
+                SELECT id
+                FROM phone_models
+                WHERE id = ANY (%s)
+                """,
+                (data.model_ids,),
+            )
+
+            existing_model_ids = {
+                row[0]
+                for row in cursor.fetchall()
+            }
+
+            missing_model_ids = (
+                    set(data.model_ids) - existing_model_ids
+            )
+
+            if missing_model_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Geçersiz telefon modeli ID'leri: "
+                        f"{sorted(missing_model_ids)}"
+                    ),
+                )
+
+            # 5. URUNUN KILIF KATEGORISINI GUNCELLE.
+            cursor.execute(
+                """
+                UPDATE products
+                SET category_id = %s
+                WHERE id = %s
+                """,
+                (
+                    data.category_id,
+                    product_id,
+                ),
+            )
+
+            # 6. ONCE ESKI MODEL ESLESTIRMELERINI KALDIR.
+            cursor.execute(
+                """
+                DELETE FROM product_compatible_models
+                WHERE product_id = %s
+                """,
+                (product_id,),
+            )
+
+            # 7. SECILEN YENI MODELLERI KAYDET.
+            for model_id in data.model_ids:
+                cursor.execute(
+                    """
+                    INSERT INTO product_compatible_models (
+                        product_id,
+                        phone_model_id
+                    )
+                    VALUES (%s, %s)
+                    """,
+                    (
+                        product_id,
+                        model_id,
+                    ),
+                )
+
+
+    # with blogu basariyla biterse transaction commit edilir.
+    return {
+        "product_id": product_id,
+        "category_id": data.category_id,
+        "model_ids": data.model_ids,
+        "message": "Ürün kategorisi ve uyumlu modeller güncellendi.",
+    }
+
+
+

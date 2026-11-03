@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from typer import models
 
 from database import get_connection
 
@@ -92,4 +93,85 @@ def get_catalog_product_detail(product_id: int):
         "stock": product[4],
         "image_url": product[5],
         "store_name": product[6],
+    }
+
+
+
+# 3. KATALOG ICIN TELEFON MARKASI, MODELI VE KILIF TURU FILTRELERI
+
+@router.get("/filters")
+def get_catalog_filters():
+
+    # Veritabanindan filtre seceneklerini getir.
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+
+            # 1. Telefon markalari ve bu markalara ait modeller.
+            cursor.execute(
+                """
+                SELECT
+                    b.id,
+                    b.name,
+                    m.id,
+                    m.name
+                FROM phone_brands AS b
+                LEFT JOIN phone_models AS m
+                    ON m.brand_id = b.id
+                ORDER BY b.name, m.name
+                """
+            )
+
+            phone_rows = cursor.fetchall()
+
+            # 2. Kilif turleri (mevcut categories tablosu).
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    name
+                FROM categories
+                ORDER BY name
+                """
+            )
+
+            category_rows = cursor.fetchall()
+
+    # SQL sonucunu React icin uygun bir yapiya donustur.
+    brands = []
+    brands_by_id = {}
+
+    for brand_id, brand_name, model_id, model_name in phone_rows:
+
+        # Her markayi listeye yalnizca bir kez ekle.
+        if brand_id not in brands_by_id:
+            brand = {
+                "id": brand_id,
+                "name": brand_name,
+                "models": [],
+            }
+
+            brands.append(brand)
+            brands_by_id[brand_id] = brand
+
+        # Markanin telefon modellerini kendi listesine ekle.
+        if model_id is not None:
+            brands_by_id[brand_id]["models"].append(
+                {
+                    "id": model_id,
+                    "name": model_name,
+                }
+            )
+
+    # Kilif turlerini JSON icin sozluk listesine donustur.
+    categories = [
+        {
+            "id": category_id,
+            "name": category_name,
+        }
+        for category_id, category_name in category_rows
+    ]
+
+    return {
+        "brands": brands,
+        "categories": categories,
     }

@@ -1,8 +1,15 @@
 
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
+from dotenv.cli import set_value
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    field_validator,
+    model_validator,
+)
 
 class SellerProductCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -79,3 +86,28 @@ class SellerProductVisibilityUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     is_active: bool
+
+
+
+# SATICININ URUN KATEGORISINI VE UYUMLU TELEFON MODELLERINI BELIRLEMESI
+class SellerProductCompatibilityUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #Ürünün kılıf türü
+    category_id: PositiveInt #Postgre sql de kimlik numaraları pozitif olmak zorunda olduğundan böyle
+
+    # Urunun uyumlu oldugu telefon modellerinin ID listesi
+
+    model_ids : list[PositiveInt] = Field(
+        min_length=1,
+        max_length=20,
+    )
+
+    #Aynı telefon modeli iki kez seçilmesin
+
+    @field_validator("model_ids")
+    @classmethod
+    def validate_model_ids(cls, value):
+        if len(value) != len(set(value)):
+            raise ValueError("Ayni Telefon Modeli Birden Fazla Seçilemez")
+        return value
