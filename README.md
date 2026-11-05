@@ -20,6 +20,7 @@ CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulama
 - Herkese açık ürün kataloğu
 - Ürün detay sayfası
 - Ürün arama ve sıralama
+- Telefon markası, modeli ve kılıf türüne göre filtreleme
 - Stok durumuna göre filtreleme
 - Gerçek ürün görselleri
 - Örnek veri kümesinde 40 telefon kılıfı görseli
@@ -181,6 +182,20 @@ Gerekirse `VITE_API_BASE_URL` ortam değişkeniyle API adresi değiştirilebilir
 `backend/scripts/seed_phone_cases.py`
 
 Örnek ürünleri eklemeden önce veritabanının ve uygun satıcı mağazasının hazırlanması gerekir.
+Telefon filtre tabloları `backend/migrations/002_phone_filters.sql` ile oluşturulur.
+40 demo ürünün ABO ilanlarından doğrulanan telefon ve kılıf türü etiketleri
+`backend/data/phone_case_labels.json` dosyasındadır. Mevcut ürünleri çoğaltmadan
+etiketlemek için, ürünleri ekledikten sonra `backend` klasöründe çalıştırın:
+
+```bash
+python scripts/assign_phone_case_labels.py
+python scripts/assign_phone_case_labels.py --verify-only
+```
+
+Bu betik yalnızca `CaseMarket Test Magazasi` mağazasının 40 yerel görselli
+ürününü hedefler; ürün adını, fiyatını, stokunu ve görsel adresini değiştirmez.
+Telefon uyumluluğu, kılıfı üreten markadan değil, kaynak ilanın uyumlu telefon
+bilgisinden alınır. Yerel ürün adları ve stoklar demo verisidir.
 
 ## API Endpoint'leri
 
@@ -209,6 +224,7 @@ Gerekirse `VITE_API_BASE_URL` ortam değişkeniyle API adresi değiştirilebilir
 | --- | --- | --- |
 | GET | `/api/catalog/products` | Aktif ürünleri listeleme |
 | GET | `/api/catalog/products/{product_id}` | Ürün detaylarını görüntüleme |
+| GET | `/api/catalog/filters` | Telefon markası, modeli ve kılıf türü seçenekleri |
 
 Satıcı işlemlerinde JWT doğrulaması ve ürün sahipliği kontrolü backend tarafında yapılır.
 

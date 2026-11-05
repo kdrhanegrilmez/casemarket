@@ -103,6 +103,10 @@ def seed(store_name: str) -> tuple[int, int, int]:
                     continue
 
                 row = existing[0]
+                # Source data has no category IDs. Keep labels assigned later by
+                # assign_phone_case_labels.py when reseeding the demo catalog.
+                if category_id is None:
+                    values = (row[1], *values[1:])
                 current = (row[1], row[2], row[3], row[4], row[5], row[6], row[7])
                 if current == values:
                     skipped += 1

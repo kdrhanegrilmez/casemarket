@@ -17,6 +17,9 @@ Commons Attribution 4.0 International (CC BY 4.0)** ile yayımlar.
 boyut optimizasyonudur. Ürün adları, Türkçe açıklamalar, TL fiyatları ve stoklar
 CaseMarket demo verisidir; ABO satış verisi veya gerçek piyasa bilgisi değildir.
 Marka ve model bilgisi Türkçe demo adlarına eklenmemiştir.
+Kaynak ilanlardan doğrulanan telefon uyumlulukları ve kılıf türleri
+`phone_case_labels.json` dosyasında tutulur; katalog bunları veritabanındaki
+ürün–model ilişkisi üzerinden gösterir.
 
 | Yerel dosya | ABO ürün kimliği | ABO görsel kimliği | Özgün kaynak |
 |---|---|---|---|

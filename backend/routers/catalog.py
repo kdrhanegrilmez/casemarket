@@ -73,7 +73,14 @@ def get_catalog_product_detail(product_id: int):
                     p.price,
                     p.stock,
                     p.image_url,
-                    s.store_name
+                    s.store_name,
+                    p.category_id,
+                    ARRAY(
+                        SELECT pcm.phone_model_id
+                        FROM product_compatible_models AS pcm
+                        WHERE pcm.product_id = p.id
+                        ORDER BY pcm.phone_model_id
+                    ) AS model_ids
                 FROM products AS p
                 JOIN sellers AS s
                     ON p.seller_id = s.id
@@ -92,15 +99,7 @@ def get_catalog_product_detail(product_id: int):
             detail="Urun bulunamadi.",
         )
 
-    return {
-        "id": product[0],
-        "name": product[1],
-        "description": product[2],
-        "price": str(product[3]),
-        "stock": product[4],
-        "image_url": product[5],
-        "store_name": product[6],
-    }
+    return _serialize_product(product)
 
 
 

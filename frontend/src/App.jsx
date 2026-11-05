@@ -127,6 +127,7 @@ function App() {
   const [selectedBrandId, setSelectedBrandId] = useState('')
   const [selectedModelId, setSelectedModelId] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [brandSearch, setBrandSearch] = useState('')
   const [modelSearch, setModelSearch] = useState('')
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const [featuredPaused, setFeaturedPaused] = useState(false)
@@ -372,7 +373,6 @@ useEffect(() => {
 
   useEffect(() => {
     const controller = new AbortController()
-    setFiltersError('')
 
     fetch(`${API_BASE_URL}/api/catalog/filters`, { signal: controller.signal })
       .then((response) => {
@@ -383,7 +383,10 @@ useEffect(() => {
         if (!Array.isArray(data.brands) || !Array.isArray(data.categories)) {
           throw new Error('Telefon seçenekleri geçersiz.')
         }
-        if (!controller.signal.aborted) setCatalogFilters(data)
+        if (!controller.signal.aborted) {
+          setCatalogFilters(data)
+          setFiltersError('')
+        }
       })
       .catch((err) => {
         if (err.name !== 'AbortError') setFiltersError(err.message)
@@ -514,19 +517,38 @@ useEffect(() => {
 }, [cartOpen, checkoutDialog])
 
   // ARAMA, FILTRELEME VE SIRALAMA
+  const modelLabels = useMemo(() => new Map(
+    catalogFilters.brands.flatMap((brand) =>
+      brand.models.map((model) => [Number(model.id), `${brand.name} ${model.name}`])
+    )
+  ), [catalogFilters])
+  const availableModelIds = useMemo(() => new Set(
+    products.flatMap((product) => product.model_ids || []).map(Number)
+  ), [products])
+  const availableCategoryIds = useMemo(() => new Set(
+    products.map((product) => Number(product.category_id)).filter(Boolean)
+  ), [products])
+  const matchingBrands = catalogFilters.brands.filter((brand) =>
+    brand.models.some((model) => availableModelIds.has(Number(model.id))) &&
+    brand.name.toLocaleLowerCase('tr-TR').includes(brandSearch.trim().toLocaleLowerCase('tr-TR'))
+  )
   const selectedBrand = catalogFilters.brands.find(
     (brand) => String(brand.id) === selectedBrandId
   )
   const matchingModels = (selectedBrand?.models || []).filter((model) =>
-    model.name.toLocaleLowerCase('tr-TR').includes(
+    availableModelIds.has(Number(model.id)) && model.name.toLocaleLowerCase('tr-TR').includes(
       modelSearch.trim().toLocaleLowerCase('tr-TR')
     )
   )
+  const compatibleModelNames = (product) => (product?.model_ids || [])
+    .map((id) => modelLabels.get(Number(id)))
+    .filter(Boolean)
 
   const visibleProducts = useMemo(() => {
     const text = search.trim().toLocaleLowerCase('tr-TR')
     const brandModelIds = new Set(
-      (selectedBrand?.models || []).map((model) => Number(model.id))
+      (catalogFilters.brands.find((brand) => String(brand.id) === selectedBrandId)?.models || [])
+        .map((model) => Number(model.id))
     )
 
     const filtered = products.filter((product) => {
@@ -534,6 +556,7 @@ useEffect(() => {
         product.name,
         product.description,
         product.store_name,
+        ...(product.model_ids || []).map((id) => modelLabels.get(Number(id))),
       ]
         .filter(Boolean)
         .join(' ')
@@ -563,7 +586,7 @@ useEffect(() => {
 
       return Number(b.id) - Number(a.id)
     })
-  }, [products, search, onlyAvailable, sortBy, selectedBrand, selectedBrandId, selectedModelId, selectedCategoryId])
+  }, [products, search, onlyAvailable, sortBy, selectedBrandId, selectedModelId, selectedCategoryId, catalogFilters, modelLabels])
 
   // SEPET HESAPLAMALARI
   const cartCount = cart.reduce(
@@ -1126,6 +1149,13 @@ async function handleCreateOrder() {
                       'Bu ürün için henüz bir açıklama eklenmedi.'}
                   </p>
 
+                  {compatibleModelNames(detail).length > 0 && (
+                    <div className="detail-content__compatibility">
+                      <span>UYUMLU TELEFONLAR</span>
+                      <p>{compatibleModelNames(detail).join(' · ')}</p>
+                    </div>
+                  )}
+
                   <strong className="detail-content__price">
                     {formatPrice(detail.price)}
                   </strong>
@@ -1348,6 +1378,7 @@ async function handleCreateOrder() {
                         setSelectedBrandId('')
                         setSelectedModelId('')
                         setSelectedCategoryId('')
+                        setBrandSearch('')
                         setModelSearch('')
                       }}>Temizle</button>
                     )}
@@ -1362,8 +1393,16 @@ async function handleCreateOrder() {
 
                   <div className="phone-filter__group">
                     <span className="phone-filter__label">01 / TELEFON MARKASI</span>
+                    <input
+                      className="phone-filter__search"
+                      type="search"
+                      aria-label="Telefon markası ara"
+                      placeholder="Marka ara..."
+                      value={brandSearch}
+                      onChange={(event) => setBrandSearch(event.target.value)}
+                    />
                     <div className="phone-filter__brands">
-                      {catalogFilters.brands.map((brand) => (
+                      {matchingBrands.map((brand) => (
                         <button
                           type="button"
                           key={brand.id}
@@ -1379,6 +1418,7 @@ async function handleCreateOrder() {
                           <span>{products.filter((product) => (product.model_ids || []).some((id) => brand.models.some((model) => Number(model.id) === Number(id)))).length}</span>
                         </button>
                       ))}
+                      {matchingBrands.length === 0 && <p className="phone-filter__note">Marka bulunamadı.</p>}
                     </div>
                   </div>
 
@@ -1417,7 +1457,7 @@ async function handleCreateOrder() {
                     <span className="phone-filter__label">03 / KILIF TÜRÜ</span>
                     <select id="case-category" value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)}>
                       <option value="">Tüm kılıf türleri</option>
-                      {catalogFilters.categories.map((category) => (
+                      {catalogFilters.categories.filter((category) => availableCategoryIds.has(Number(category.id))).map((category) => (
                         <option key={category.id} value={category.id}>{category.name}</option>
                       ))}
                     </select>
@@ -1609,6 +1649,12 @@ async function handleCreateOrder() {
                           {product.name}
                         </button>
                       </h3>
+
+                      {compatibleModelNames(product).length > 0 && (
+                        <p className="product-card__compatibility">
+                          {compatibleModelNames(product).join(' · ')}
+                        </p>
+                      )}
 
                       <p className="product-card__description">
                         {product.description ||

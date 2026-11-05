@@ -589,6 +589,7 @@
 .phone-filter__group { display: block; margin-top: 29px; }
 .phone-filter__label { display: block; margin-bottom: 12px; color: #89887d; font-size: 9px; font-weight: 700; letter-spacing: .12em; }
 .phone-filter__brands, .phone-filter__models { display: grid; gap: 5px; }
+.phone-filter__brands { max-height: 310px; overflow-y: auto; }
 .phone-filter__models { max-height: 225px; overflow-y: auto; }
 .phone-filter__brand, .phone-filter__model { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 10px 11px; border: 1px solid transparent; background: transparent; color: #535950; font-size: 12px; text-align: left; cursor: pointer; }
 .phone-filter__brand:hover, .phone-filter__model:hover { background: #ebe8df; }
@@ -836,6 +837,14 @@
   margin: 0 0 20px;
 }
 
+.product-card__compatibility {
+  margin: 0 0 8px;
+  color: #8b765c;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .product-card__bottom {
   display: flex;
   align-items: baseline;
@@ -1053,6 +1062,10 @@
   color: #73766e;
   margin: 0 0 34px;
 }
+
+.detail-content__compatibility { margin: -14px 0 29px; }
+.detail-content__compatibility span { color: #9b8e7b; font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.detail-content__compatibility p { margin: 8px 0 0; color: #3e473e; font-size: 14px; line-height: 1.6; }
 
 .detail-content__price {
   font-size: 33px;
