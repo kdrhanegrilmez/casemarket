@@ -122,6 +122,8 @@ function App() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
   const [catalogFilters, setCatalogFilters] = useState({ brands: [], categories: [] })
   const [filtersError, setFiltersError] = useState('')
   const [selectedBrandId, setSelectedBrandId] = useState('')
@@ -546,6 +548,8 @@ useEffect(() => {
 
   const visibleProducts = useMemo(() => {
     const text = search.trim().toLocaleLowerCase('tr-TR')
+    const minimum = minPrice === '' ? null : Number(minPrice)
+    const maximum = maxPrice === '' ? null : Number(maxPrice)
     const brandModelIds = new Set(
       (catalogFilters.brands.find((brand) => String(brand.id) === selectedBrandId)?.models || [])
         .map((model) => Number(model.id))
@@ -565,6 +569,8 @@ useEffect(() => {
       return (
         (!text || searchable.includes(text)) &&
         (!onlyAvailable || Number(product.stock) > 0) &&
+        (minimum === null || Number(product.price) >= minimum) &&
+        (maximum === null || Number(product.price) <= maximum) &&
         (!selectedCategoryId || String(product.category_id) === selectedCategoryId) &&
         (!selectedBrandId || (product.model_ids || []).some((id) => brandModelIds.has(Number(id)))) &&
         (!selectedModelId || (product.model_ids || []).some((id) => String(id) === selectedModelId))
@@ -586,7 +592,7 @@ useEffect(() => {
 
       return Number(b.id) - Number(a.id)
     })
-  }, [products, search, onlyAvailable, sortBy, selectedBrandId, selectedModelId, selectedCategoryId, catalogFilters, modelLabels])
+  }, [products, search, onlyAvailable, minPrice, maxPrice, sortBy, selectedBrandId, selectedModelId, selectedCategoryId, catalogFilters, modelLabels])
 
   // SEPET HESAPLAMALARI
   const cartCount = cart.reduce(
@@ -1373,11 +1379,13 @@ async function handleCreateOrder() {
                       <span className="overline">SANA UYGUN OLAN</span>
                       <h3>Telefonunu bul.</h3>
                     </div>
-                    {(selectedBrandId || selectedCategoryId) && (
+                    {(selectedBrandId || selectedCategoryId || minPrice || maxPrice) && (
                       <button type="button" onClick={() => {
                         setSelectedBrandId('')
                         setSelectedModelId('')
                         setSelectedCategoryId('')
+                        setMinPrice('')
+                        setMaxPrice('')
                         setBrandSearch('')
                         setModelSearch('')
                       }}>Temizle</button>
@@ -1462,6 +1470,14 @@ async function handleCreateOrder() {
                       ))}
                     </select>
                   </label>
+                  <div className="phone-filter__group">
+                    <span className="phone-filter__label">04 / FİYAT ARALIĞI</span>
+                    <div className="phone-filter__price-range">
+                      <label><span>En az ₺</span><input type="number" min="0" step="0.01" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} /></label>
+                      <label><span>En çok ₺</span><input type="number" min="0" step="0.01" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
+                    </div>
+                    {minPrice !== '' && maxPrice !== '' && Number(minPrice) > Number(maxPrice) && <p className="phone-filter__note">Alt sınır üst sınırdan büyük olamaz.</p>}
+                  </div>
                   <p className="phone-filter__hint">Yalnızca uyumlu olduğu telefon modeli belirtilen ürünler eşleşir.</p>
                 </aside>
 

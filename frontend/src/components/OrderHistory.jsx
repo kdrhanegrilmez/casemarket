@@ -31,6 +31,10 @@ function getStatusText(status) {
   return status
 }
 
+function getShippingStatusText(status) {
+  return { pending: 'Hazırlanmayı bekliyor', preparing: 'Hazırlanıyor', shipped: 'Kargoda', delivered: 'Teslim edildi' }[status] || status
+}
+
 
 function OrderHistory({ token, onBack, filter = 'history' }) {
   // Musterinin siparislerini React state'inde tut.
@@ -248,6 +252,9 @@ function OrderHistory({ token, onBack, filter = 'history' }) {
                         {item.quantity} adet · Birim fiyat:
                         {' '}{formatPrice(item.unit_price)}
                       </p>
+                      {order.status === 'paid' && item.shipping_status && (
+                        <p>Kargo: {getShippingStatusText(item.shipping_status)}</p>
+                      )}
                     </div>
 
                     <strong>

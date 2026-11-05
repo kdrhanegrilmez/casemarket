@@ -13,7 +13,7 @@ const formatPrice = (price) =>
     currency: 'TRY',
   })
 
-function SellerProductRow({ product, token, onUpdated }) {
+function SellerProductRow({ product, token, onUpdated, catalogFilters }) {
 
   // Bu satir duzenleme modunda mi?
   const [editing, setEditing] = useState(false)
@@ -23,11 +23,20 @@ function SellerProductRow({ product, token, onUpdated }) {
   const [stock, setStock] = useState(String(product.stock))
   const [imageUrl,setImageUrl] = useState(String(product.image_url || ''))
   const [name,setName] =useState(String(product.name))
+  const [categoryId, setCategoryId] = useState(String(product.category_id || ''))
+  const [modelIds, setModelIds] = useState(product.model_ids || [])
+  const [brandId, setBrandId] = useState('')
 
 
   // API istegi devam ederken butonlari kilitleyecegiz.
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const selectedBrand = catalogFilters.brands.find((brand) => String(brand.id) === brandId)
+  const modelNames = (product.model_ids || []).flatMap((id) =>
+    catalogFilters.brands.flatMap((brand) =>
+      brand.models.filter((model) => model.id === id).map((model) => `${brand.name} ${model.name}`)
+    )
+  )
 
   // FastAPI'nin hata mesajini okunabilir hale getir.
   function getErrorMessage(data) {
@@ -50,6 +59,12 @@ function SellerProductRow({ product, token, onUpdated }) {
     setEditing(true)
     setName(product.name )
     setImageUrl(product.image_url || '')
+    setCategoryId(String(product.category_id || ''))
+    setModelIds(product.model_ids || [])
+    const firstBrand = catalogFilters.brands.find((brand) =>
+      brand.models.some((model) => (product.model_ids || []).includes(model.id))
+    )
+    setBrandId(String(firstBrand?.id || ''))
   }
 
   // Fiyat ve stok bilgilerini backend'e kaydet.
@@ -60,15 +75,17 @@ function SellerProductRow({ product, token, onUpdated }) {
     const newName = name.trim()
 
     if (
-      name.length<3 ||
+      newName.length < 3 ||
       price.trim() === '' ||
       stock.trim() === '' ||
       !Number.isFinite(newPrice) ||
       newPrice <= 0 ||
       !Number.isInteger(newStock) ||
-      newStock < 0
+      newStock < 0 ||
+      !categoryId ||
+      modelIds.length === 0
     ) {
-      setError('Geçerli bir fiyat ve stok miktarı gir.')
+      setError('Ürün bilgilerini, kılıf türünü ve en az bir telefon modelini seç.')
       return
     }
 
@@ -88,7 +105,9 @@ function SellerProductRow({ product, token, onUpdated }) {
             price: newPrice,
             stock: newStock,
             name: newName,
-            image_url: newImageUrl || null
+            image_url: newImageUrl || null,
+            category_id: Number(categoryId),
+            model_ids: modelIds,
           }),
         }
       )
@@ -173,6 +192,7 @@ function SellerProductRow({ product, token, onUpdated }) {
 
 
         <small>Ürün #{product.id}</small>
+        {!editing && modelNames.length > 0 && <small className="seller-row-models">{modelNames.join(' · ')}</small>}
 
          {/* Düzenle butonuna basılınca görsel alanını göster. */}
           {editing && (
@@ -190,6 +210,47 @@ function SellerProductRow({ product, token, onUpdated }) {
               </label>
           )
           }
+
+          {editing && (
+            <div className="seller-row-compatibility">
+              <label>
+                Kılıf türü
+                <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+                  <option value="">Tür seç</option>
+                  {catalogFilters.categories.map((category) => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Telefon markası
+                <select value={brandId} onChange={(event) => setBrandId(event.target.value)}>
+                  <option value="">Marka seç</option>
+                  {catalogFilters.brands.map((brand) => (
+                    <option key={brand.id} value={brand.id}>{brand.name}</option>
+                  ))}
+                </select>
+              </label>
+              {selectedBrand && (
+                <fieldset>
+                  <legend>Uyumlu modeller</legend>
+                  {selectedBrand.models.map((model) => (
+                    <label key={model.id}>
+                      <input
+                        type="checkbox"
+                        checked={modelIds.includes(model.id)}
+                        onChange={(event) => setModelIds((ids) => event.target.checked
+                          ? [...ids, model.id]
+                          : ids.filter((id) => id !== model.id))}
+                      />
+                      {model.name}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+              <small>{modelIds.length} model seçili. Farklı markaya geçerek ek model seçebilirsin.</small>
+            </div>
+          )}
 
 
 

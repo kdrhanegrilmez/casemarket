@@ -16,13 +16,15 @@ class RouteCompatibilityTests(unittest.TestCase):
             ("GET", "/api/products"),
             ("GET", "/api/catalog/products"),
             ("GET", "/api/products/{product_id}"),
-            ("POST", "/api/products"),
-            ("PATCH", "/api/products/{product_id}/stock"),
             ("POST", "/api/auth/register"),
             ("POST", "/api/auth/login"),
+            ("GET", "/api/sellers/me/orders"),
+            ("PATCH", "/api/sellers/me/orders/{order_id}/items/{item_id}/shipping"),
         }
 
         self.assertTrue(expected_routes.issubset(actual_routes))
+        self.assertNotIn(("POST", "/api/products"), actual_routes)
+        self.assertNotIn(("PATCH", "/api/products/{product_id}/stock"), actual_routes)
 
 
 if __name__ == "__main__":

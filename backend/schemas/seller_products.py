@@ -1,7 +1,6 @@
 
 from decimal import Decimal
 
-from dotenv.cli import set_value
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -33,6 +32,24 @@ class SellerProductCreate(BaseModel):
         default=None,
         gt=0
     )
+
+    #Ürünün uyumlu olduğu telefon modelleri
+    model_ids: list[PositiveInt] = Field(
+        default_factory=list,
+        max_length=20,
+    )
+
+    @field_validator("model_ids")
+    @classmethod
+    def validate_model_ids(cls, value):
+        if len(value) != len(set(value)):
+            raise ValueError(
+                "Aynı telefon modeli birden fazla kez seçilemez"
+            )
+        return value
+
+
+
     # Ürün görselinin adresi. Görsel eklemek zorunlu değil
 
     image_url: str |None =Field(
@@ -70,14 +87,29 @@ class SellerProductUpdate(BaseModel):
         max_length=150
     )
 
+    category_id: PositiveInt | None = None
+    model_ids: list[PositiveInt] | None = Field(default=None, max_length=20)
+
+    @field_validator("model_ids")
+    @classmethod
+    def unique_model_ids(cls, value):
+        if value is not None and len(value) != len(set(value)):
+            raise ValueError("Aynı telefon modeli birden fazla kez seçilemez")
+        return value
+
     @model_validator(mode = "after")
     def check_fields(self):
         if (
                 self.price is None
                 and self.stock is None
                 and self.name is None
-                and self.image_url is None):
-            raise ValueError("Fiyat veya stok alanlarnadan en az biri eksik")
+                and self.image_url is None
+                and self.category_id is None
+                and self.model_ids is None):
+            raise ValueError("Güncellenecek en az bir alan gerekli")
+
+        if (self.category_id is None) != (self.model_ids is None):
+            raise ValueError("Kılıf türü ve telefon modelleri birlikte gönderilmeli")
 
         return self
 
@@ -99,7 +131,7 @@ class SellerProductCompatibilityUpdate(BaseModel):
     # Urunun uyumlu oldugu telefon modellerinin ID listesi
 
     model_ids : list[PositiveInt] = Field(
-        min_length=1,
+        min_length=0,
         max_length=20,
     )
 

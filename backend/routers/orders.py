@@ -208,7 +208,8 @@ def get_my_orders(
                     oi.product_id,
                     oi.product_name,
                     oi.quantity,
-                    oi.unit_price
+                    oi.unit_price,
+                    oi.shipping_status
                 FROM orders AS o
                 LEFT JOIN order_items AS oi
                     ON oi.order_id = o.id
@@ -250,6 +251,7 @@ def get_my_orders(
                     "product_name": row[7],
                     "quantity": row[8],
                     "unit_price": str(row[9]),
+                    "shipping_status": row[10],
                 }
             )
 

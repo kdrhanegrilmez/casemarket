@@ -119,5 +119,10 @@ CREATE TABLE IF NOT EXISTS order_items (
         CHECK (quantity > 0),
 
     unit_price NUMERIC(10, 2) NOT NULL
-        CHECK (unit_price > 0)
+        CHECK (unit_price > 0),
+
+    shipping_status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (shipping_status IN ('pending', 'preparing', 'shipped', 'delivered'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_order_items_seller_order ON order_items(seller_id, order_id);

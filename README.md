@@ -4,13 +4,14 @@
 
 CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulamasıdır. Amaç; müşterilerin farklı mağazalardaki telefon kılıflarını keşfedebildiği, satıcıların kendi ürünlerini yönetebildiği ve ileride yöneticilerin siparişleri takip edebildiği bir pazaryeri oluşturmaktır.
 
-> **Proje durumu:** Giriş/kayıt, ürün vitrini, sepet, demo sipariş ve satıcı ürün yönetiminin temel akışları geliştirildi. Gerçek ödeme, kargo/teslimat takibi, admin paneli ve canlı destek henüz tamamlanmadı.
+> **Proje durumu:** Giriş/kayıt, ürün vitrini, sepet, demo sipariş, satıcı ürün yönetimi ve ürün kalemi bazında kargo durumu geliştirildi. Gerçek ödeme, kargo firması entegrasyonu, admin paneli ve canlı destek henüz tamamlanmadı.
 
 ### Hesap ve demo ödeme akışı
 
 - **Hesabım** ekranında profil bilgileri, teslimat adresleri, demo kartın yalnızca görünen bilgileri, aktif siparişler ve tüm sipariş geçmişi bulunur. Satıcı hesabında panel girişi de bu ekrandadır.
 - Sepette adres ve demo ödeme yöntemi seçilerek sipariş tamamlanır. Gerçek ödeme alınmaz; tam kart numarası ve güvenlik kodu saklanmaz. Canlı ödeme için ayrı bir ödeme sağlayıcısı entegrasyonu gerekir.
 - Mevcut PostgreSQL veritabanını kullanan kurulumlarda bir kez `cd backend && python -m scripts.apply_account_migration` çalıştırılmalıdır. Yeni kurulumlarda `backend/schema.sql` bu alanları içerir.
+- Satıcı kargo durumu için mevcut veritabanında bir kez `cd backend && python scripts/apply_seller_shipping_migration.py` çalıştırılmalıdır. Yeni kurulumlarda sütun `backend/schema.sql` içindedir.
 
 ## Mevcut Özellikler
 
@@ -21,6 +22,7 @@ CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulama
 - Ürün detay sayfası
 - Ürün arama ve sıralama
 - Telefon markası, modeli ve kılıf türüne göre filtreleme
+- Minimum ve maksimum fiyat filtresi
 - Stok durumuna göre filtreleme
 - Gerçek ürün görselleri
 - Örnek veri kümesinde 44 telefon kılıfı görseli
@@ -51,13 +53,15 @@ CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulama
 - Satıcının kendi ürünlerini listelemesi
 - Yeni ürün oluşturma
 - Ürüne görsel adresi ekleme
+- Ürün oluştururken ve düzenlerken kategori ile uyumlu telefon modellerini seçme
 - Ürün fiyatını düzenleme
 - Ürün stok miktarını değiştirme
 - Ürünü yayından kaldırma
 - Pasif ürünü tekrar yayına alma
+- Satıcı siparişlerini görme ve kargo durumunu yönetme
 - Backend tarafında mağaza sahipliği ve rol kontrolü
 
-> **Devam eden çalışma:** Mevcut ürünün görselini değiştirme özelliğinde Pydantic şeması hazırlandı. SQL güncellemesi ve React düzenleme alanı henüz tamamlanmadı. Fiyat, stok ve görünürlük işlemlerinin uçtan uca testleri de sürüyor.
+> Kargo durumu her satıcıya ait sipariş kalemi için `bekliyor → hazırlanıyor → kargoda → teslim edildi` sırasıyla ilerler. Kargoya verme için teslimat adresi gerekir.
 
 ## Kullanılan Teknolojiler
 
@@ -66,7 +70,7 @@ CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulama
 | Frontend | React, JavaScript, JSX, Vite, CSS |
 | Backend | Python, FastAPI, Pydantic |
 | Veritabanı | PostgreSQL |
-| Veritabanı bağlantısı | psycopg |
+| Veritabanı bağlantısı | psycopg, psycopg-pool |
 | Kimlik doğrulama | JWT, Argon2 |
 | Geliştirme ortamı | Docker Compose, PyCharm |
 | Versiyon kontrolü | Git, GitHub |
@@ -217,8 +221,11 @@ bilgisinden alınır. Yerel ürün adları ve stoklar demo verisidir.
 | GET | `/api/sellers/me` | Kendi mağazasını görüntüleme |
 | GET | `/api/sellers/me/products` | Ürünlerini listeleme |
 | POST | `/api/sellers/me/products` | Yeni ürün ekleme |
-| PATCH | `/api/sellers/me/products/{product_id}` | Fiyat ve stok düzenleme |
+| PATCH | `/api/sellers/me/products/{product_id}` | Ad, görsel, fiyat, stok, kategori ve uyumlu modelleri düzenleme |
 | PATCH | `/api/sellers/me/products/{product_id}/visibility` | Ürün görünürlüğünü değiştirme |
+| PATCH | `/api/sellers/me/products/{product_id}/compatibility` | Kategori ve model eşleştirmesini ayrı güncelleme |
+| GET | `/api/sellers/me/orders` | Satıcının sipariş kalemlerini listeleme |
+| PATCH | `/api/sellers/me/orders/{order_id}/items/{item_id}/shipping` | Kargo durumunu ilerletme |
 
 ### Catalog
 
@@ -229,6 +236,7 @@ bilgisinden alınır. Yerel ürün adları ve stoklar demo verisidir.
 | GET | `/api/catalog/filters` | Telefon markası, modeli ve kılıf türü seçenekleri |
 
 Satıcı işlemlerinde JWT doğrulaması ve ürün sahipliği kontrolü backend tarafında yapılır.
+Eski `/api/products` deneme yazma uç noktaları kaldırılmıştır; gerçek ürün yazma işlemleri kimlik doğrulamalı satıcı API'sinden yapılır.
 
 ## Geliştirme Yol Haritası
 
@@ -251,7 +259,7 @@ Satıcı işlemlerinde JWT doğrulaması ve ürün sahipliği kontrolü backend 
 
 ### Geliştirilmekte Olanlar
 
-- [ ] Mevcut ürünün görselini değiştirme
+- [x] Mevcut ürünün görselini değiştirme
 - [ ] Satıcı ürün işlemlerinin uçtan uca testleri
 - [ ] Dosyadan ürün görseli yükleme (opsiyonel)
 - [ ] Sipariş oluşturma

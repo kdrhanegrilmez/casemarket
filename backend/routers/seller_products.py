@@ -1,5 +1,3 @@
-from xxlimited_35 import Null
-
 from fastapi import APIRouter, Depends, HTTPException
 
 from core.dependencies import get_current_user
@@ -16,6 +14,20 @@ router = APIRouter(
     prefix="/api/sellers/me/products",
     tags=["seller-products"],
 )
+
+
+def _validate_compatibility(cursor, category_id, model_ids):
+    if model_ids and category_id is None:
+        raise HTTPException(status_code=422, detail="Telefon modeli seçilen ürün için kılıf türü gereklidir.")
+    if category_id is not None:
+        cursor.execute("SELECT 1 FROM categories WHERE id = %s", (category_id,))
+        if cursor.fetchone() is None:
+            raise HTTPException(status_code=400, detail="Kategori bulunamadı.")
+    if model_ids:
+        cursor.execute("SELECT id FROM phone_models WHERE id = ANY(%s)", (model_ids,))
+        missing = set(model_ids) - {row[0] for row in cursor.fetchall()}
+        if missing:
+            raise HTTPException(status_code=400, detail=f"Geçersiz telefon modeli ID'leri: {sorted(missing)}")
 
 
 # 1. SATICININ KENDI MAGAZASINA URUN EKLEMESI
@@ -72,22 +84,7 @@ def create_my_product(
 
             seller_id = seller[0]
 
-            # Kategori belirtilmisse veritabaninda kontrol et.
-            if data.category_id is not None:
-                cursor.execute(
-                    """
-                    SELECT 1
-                    FROM categories
-                    WHERE id = %s
-                    """,
-                    (data.category_id,),
-                )
-
-                if cursor.fetchone() is None:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Kategori bulunamadi.",
-                    )
+            _validate_compatibility(cursor, data.category_id, data.model_ids)
 
             # Urunu gercek products tablosuna kaydet.
 
@@ -124,6 +121,12 @@ def create_my_product(
             )
 
             product = cursor.fetchone()
+            for model_id in data.model_ids:
+                cursor.execute(
+                    "INSERT INTO product_compatible_models (product_id, phone_model_id) VALUES (%s, %s)",
+                    (product[0], model_id),
+                )
+
 
     return {
         "id": product[0],
@@ -134,6 +137,7 @@ def create_my_product(
         "price": str(product[5]),
         "stock": product[6],
         "image_url": product[7],
+        "model_ids": data.model_ids,
     }
 
 
@@ -162,7 +166,13 @@ def get_my_products(
                     p.category_id,
                     p.is_active,
                     s.store_name,
-                    p.image_url
+                    p.image_url,
+                    ARRAY(
+                        SELECT pcm.phone_model_id
+                        FROM product_compatible_models AS pcm
+                        WHERE pcm.product_id = p.id
+                        ORDER BY pcm.phone_model_id
+                    ) AS model_ids
                 FROM products AS p
                 JOIN sellers AS s
                     ON p.seller_id = s.id
@@ -186,6 +196,7 @@ def get_my_products(
             "is_active": row[5],
             "store_name": row[6],
             "image_url": row[7],
+            "model_ids": row[8],
         })
 
     return products
@@ -218,6 +229,21 @@ def update_my_product(
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT p.id FROM products AS p
+                JOIN sellers AS s ON s.id = p.seller_id
+                WHERE p.id = %s AND s.owner_user_id = %s
+                FOR UPDATE OF p
+                """,
+                (product_id, current_user["id"]),
+            )
+            if cursor.fetchone() is None:
+                raise HTTPException(status_code=404, detail="Ürün bulunamadı veya size ait değil.")
+
+            if data.model_ids is not None:
+                _validate_compatibility(cursor, data.category_id, data.model_ids)
+
             # COALESCE: Fiyat, stok ve görsel adresini güncelle.
             #Yeni görsel adresi gönderilirse → onu kaydet.
             #None gönderilirse → eski görsel adresini koru.
@@ -228,7 +254,8 @@ def update_my_product(
                      name      = COALESCE(%s,p.name),
                     price     = COALESCE(%s, p.price),
                     stock     = COALESCE(%s, p.stock),
-                    image_url = COALESCE(%s, p.image_url) FROM sellers AS s
+                    image_url = COALESCE(%s, p.image_url),
+                    category_id = COALESCE(%s, p.category_id) FROM sellers AS s
                 WHERE
                     p.id = %s
                   AND p.seller_id = s.id
@@ -239,12 +266,14 @@ def update_my_product(
                     , p.price
                     , p.stock
                     , p.image_url
+                    , p.category_id
                 """,
                 (
                     name,
                     data.price,
                     data.stock,
                     data.image_url,
+                    data.category_id,
                     product_id,
                     current_user["id"],
                 ),
@@ -259,12 +288,31 @@ def update_my_product(
                     detail="Urun bulunamadi veya bu urun size ait degil.",
                 )
 
+            if data.model_ids is not None:
+                cursor.execute(
+                    "DELETE FROM product_compatible_models WHERE product_id = %s",
+                    (product_id,),
+                )
+                for model_id in data.model_ids:
+                    cursor.execute(
+                        "INSERT INTO product_compatible_models (product_id, phone_model_id) VALUES (%s, %s)",
+                        (product_id, model_id),
+                    )
+            else:
+                cursor.execute(
+                    "SELECT phone_model_id FROM product_compatible_models WHERE product_id = %s ORDER BY phone_model_id",
+                    (product_id,),
+                )
+                model_ids = [row[0] for row in cursor.fetchall()]
+
     return {
         "id": product[0],
         "name": product[1],
         "price": str(product[2]),
         "stock": product[3],
         "image_url": product[4],
+        "category_id": product[5],
+        "model_ids": data.model_ids if data.model_ids is not None else model_ids,
     }
 
 
