@@ -1,8 +1,6 @@
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from typer import models
-
 from database import get_connection
 
 
@@ -18,6 +16,8 @@ def _serialize_product(row: tuple[Any, ...]) -> dict[str, Any]:
         "stock": row[4],
         "image_url": row[5],
         "store_name": row[6],
+        "category_id": row[7],
+        "model_ids": row[8],
     }
 
 
@@ -34,7 +34,14 @@ def get_catalog_products():
                     p.price,
                     p.stock,
                     p.image_url,
-                    s.store_name
+                    s.store_name,
+                    p.category_id,
+                    ARRAY(
+                        SELECT pcm.phone_model_id
+                        FROM product_compatible_models AS pcm
+                        WHERE pcm.product_id = p.id
+                        ORDER BY pcm.phone_model_id
+                    ) AS model_ids
                 FROM products AS p
                 JOIN sellers AS s ON s.id = p.seller_id
                 WHERE p.is_active = TRUE

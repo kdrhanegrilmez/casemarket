@@ -122,6 +122,12 @@ function App() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState('newest')
   const [onlyAvailable, setOnlyAvailable] = useState(false)
+  const [catalogFilters, setCatalogFilters] = useState({ brands: [], categories: [] })
+  const [filtersError, setFiltersError] = useState('')
+  const [selectedBrandId, setSelectedBrandId] = useState('')
+  const [selectedModelId, setSelectedModelId] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState('')
+  const [modelSearch, setModelSearch] = useState('')
   const [featuredIndex, setFeaturedIndex] = useState(0)
   const [featuredPaused, setFeaturedPaused] = useState(false)
   const featuredRailRef = useRef(null)
@@ -364,6 +370,28 @@ useEffect(() => {
     return () => controller.abort()
   }, [reloadKey])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    setFiltersError('')
+
+    fetch(`${API_BASE_URL}/api/catalog/filters`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error('Telefon seçenekleri yüklenemedi.')
+        return response.json()
+      })
+      .then((data) => {
+        if (!Array.isArray(data.brands) || !Array.isArray(data.categories)) {
+          throw new Error('Telefon seçenekleri geçersiz.')
+        }
+        if (!controller.signal.aborted) setCatalogFilters(data)
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setFiltersError(err.message)
+      })
+
+    return () => controller.abort()
+  }, [reloadKey])
+
   // URUN DETAYINI GETIR
   useEffect(() => {
     if (selectedId === null) {
@@ -486,8 +514,20 @@ useEffect(() => {
 }, [cartOpen, checkoutDialog])
 
   // ARAMA, FILTRELEME VE SIRALAMA
+  const selectedBrand = catalogFilters.brands.find(
+    (brand) => String(brand.id) === selectedBrandId
+  )
+  const matchingModels = (selectedBrand?.models || []).filter((model) =>
+    model.name.toLocaleLowerCase('tr-TR').includes(
+      modelSearch.trim().toLocaleLowerCase('tr-TR')
+    )
+  )
+
   const visibleProducts = useMemo(() => {
     const text = search.trim().toLocaleLowerCase('tr-TR')
+    const brandModelIds = new Set(
+      (selectedBrand?.models || []).map((model) => Number(model.id))
+    )
 
     const filtered = products.filter((product) => {
       const searchable = [
@@ -501,7 +541,10 @@ useEffect(() => {
 
       return (
         (!text || searchable.includes(text)) &&
-        (!onlyAvailable || Number(product.stock) > 0)
+        (!onlyAvailable || Number(product.stock) > 0) &&
+        (!selectedCategoryId || String(product.category_id) === selectedCategoryId) &&
+        (!selectedBrandId || (product.model_ids || []).some((id) => brandModelIds.has(Number(id)))) &&
+        (!selectedModelId || (product.model_ids || []).some((id) => String(id) === selectedModelId))
       )
     })
 
@@ -520,7 +563,7 @@ useEffect(() => {
 
       return Number(b.id) - Number(a.id)
     })
-  }, [products, search, onlyAvailable, sortBy])
+  }, [products, search, onlyAvailable, sortBy, selectedBrand, selectedBrandId, selectedModelId, selectedCategoryId])
 
   // SEPET HESAPLAMALARI
   const cartCount = cart.reduce(
@@ -1293,6 +1336,96 @@ async function handleCreateOrder() {
 
               </div>
 
+              <div className="catalog-layout">
+                <aside className="phone-filter" aria-label="Telefon ve kılıf filtreleri">
+                  <div className="phone-filter__heading">
+                    <div>
+                      <span className="overline">SANA UYGUN OLAN</span>
+                      <h3>Telefonunu bul.</h3>
+                    </div>
+                    {(selectedBrandId || selectedCategoryId) && (
+                      <button type="button" onClick={() => {
+                        setSelectedBrandId('')
+                        setSelectedModelId('')
+                        setSelectedCategoryId('')
+                        setModelSearch('')
+                      }}>Temizle</button>
+                    )}
+                  </div>
+
+                  {filtersError && (
+                    <p className="phone-filter__note" role="alert">
+                      {filtersError}{' '}
+                      <button className="phone-filter__retry" type="button" onClick={() => setReloadKey((key) => key + 1)}>Tekrar dene</button>
+                    </p>
+                  )}
+
+                  <div className="phone-filter__group">
+                    <span className="phone-filter__label">01 / TELEFON MARKASI</span>
+                    <div className="phone-filter__brands">
+                      {catalogFilters.brands.map((brand) => (
+                        <button
+                          type="button"
+                          key={brand.id}
+                          className={selectedBrandId === String(brand.id) ? 'phone-filter__brand phone-filter__brand--active' : 'phone-filter__brand'}
+                          aria-pressed={selectedBrandId === String(brand.id)}
+                          onClick={() => {
+                            setSelectedBrandId(selectedBrandId === String(brand.id) ? '' : String(brand.id))
+                            setSelectedModelId('')
+                            setModelSearch('')
+                          }}
+                        >
+                          <span>{brand.name}</span>
+                          <span>{products.filter((product) => (product.model_ids || []).some((id) => brand.models.some((model) => Number(model.id) === Number(id)))).length}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="phone-filter__group">
+                    <span className="phone-filter__label">02 / TELEFON MODELİ</span>
+                    {selectedBrand ? (
+                      <>
+                        <input
+                          className="phone-filter__search"
+                          type="search"
+                          aria-label="Telefon modeli ara"
+                          placeholder="Model ara..."
+                          value={modelSearch}
+                          onChange={(event) => setModelSearch(event.target.value)}
+                        />
+                        <div className="phone-filter__models">
+                          {matchingModels.map((model) => (
+                            <button
+                              type="button"
+                              key={model.id}
+                              className={selectedModelId === String(model.id) ? 'phone-filter__model phone-filter__model--active' : 'phone-filter__model'}
+                              aria-pressed={selectedModelId === String(model.id)}
+                              onClick={() => setSelectedModelId(selectedModelId === String(model.id) ? '' : String(model.id))}
+                            >
+                              <span>{model.name}</span>
+                              <span>{products.filter((product) => (product.model_ids || []).some((id) => Number(id) === Number(model.id))).length}</span>
+                            </button>
+                          ))}
+                          {matchingModels.length === 0 && <p className="phone-filter__note">Model bulunamadı.</p>}
+                        </div>
+                      </>
+                    ) : <p className="phone-filter__note">Önce telefon markanı seç.</p>}
+                  </div>
+
+                  <label className="phone-filter__group" htmlFor="case-category">
+                    <span className="phone-filter__label">03 / KILIF TÜRÜ</span>
+                    <select id="case-category" value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)}>
+                      <option value="">Tüm kılıf türleri</option>
+                      {catalogFilters.categories.map((category) => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <p className="phone-filter__hint">Yalnızca uyumlu olduğu telefon modeli belirtilen ürünler eşleşir.</p>
+                </aside>
+
+                <div className="catalog-layout__content">
               {/* ARAMA VE FILTRE */}
               <div className="catalog-toolbar">
 
@@ -1531,6 +1664,8 @@ async function handleCreateOrder() {
 
                 ))}
 
+              </div>
+                </div>
               </div>
             </section>
 

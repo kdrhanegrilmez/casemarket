@@ -565,8 +565,43 @@
 
 /* ARAMA VE FILTRELER */
 
-.catalog-toolbar {
+.catalog-layout {
+  display: grid;
+  grid-template-columns: 245px minmax(0, 1fr);
+  align-items: start;
+  gap: 34px;
   margin-top: 43px;
+}
+
+.catalog-layout__content { min-width: 0; }
+
+.phone-filter {
+  padding: 24px 21px;
+  border: 1px solid #dedbd3;
+  background: #f5f3ed;
+  color: #333a32;
+}
+
+.phone-filter__heading { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+.phone-filter__heading .overline { font-size: 9px; letter-spacing: .13em; color: #978870; }
+.phone-filter__heading h3 { margin: 9px 0 0; font-family: Georgia, serif; font-size: 25px; font-weight: 400; letter-spacing: -.035em; }
+.phone-filter__heading button { padding: 3px 0; border: 0; background: none; color: #816e57; font-size: 11px; text-decoration: underline; cursor: pointer; }
+.phone-filter__group { display: block; margin-top: 29px; }
+.phone-filter__label { display: block; margin-bottom: 12px; color: #89887d; font-size: 9px; font-weight: 700; letter-spacing: .12em; }
+.phone-filter__brands, .phone-filter__models { display: grid; gap: 5px; }
+.phone-filter__models { max-height: 225px; overflow-y: auto; }
+.phone-filter__brand, .phone-filter__model { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; padding: 10px 11px; border: 1px solid transparent; background: transparent; color: #535950; font-size: 12px; text-align: left; cursor: pointer; }
+.phone-filter__brand:hover, .phone-filter__model:hover { background: #ebe8df; }
+.phone-filter__brand--active, .phone-filter__model--active { border-color: #b5aa98; background: #e9e4d9; color: #273128; font-weight: 700; }
+.phone-filter__brand span:last-child, .phone-filter__model span:last-child { color: #a09b8f; font-size: 10px; }
+.phone-filter__search, .phone-filter select { width: 100%; min-height: 39px; padding: 9px 10px; border: 1px solid #d7d2c8; border-radius: 0; background: #fffefa; color: #333a32; font: inherit; font-size: 12px; }
+.phone-filter__search { margin-bottom: 8px; }
+.phone-filter__note { margin: 0; color: #8b8b80; font-size: 11px; line-height: 1.5; }
+.phone-filter__retry { padding: 0; border: 0; background: none; color: #816e57; font: inherit; text-decoration: underline; cursor: pointer; }
+.phone-filter__hint { margin: 25px 0 0; padding-top: 15px; border-top: 1px solid #dedbd3; color: #99998e; font-size: 10px; line-height: 1.55; }
+
+.catalog-toolbar {
+  margin-top: 0;
   padding: 19px 0;
   border-top: 1px solid #d9d6cf;
   border-bottom: 1px solid #d9d6cf;
@@ -1352,6 +1387,8 @@
 }
 
 @media (max-width: 970px) {
+  .catalog-layout { grid-template-columns: 205px minmax(0, 1fr); gap: 20px; }
+  .phone-filter { padding: 19px 14px; }
   .site-header {
     height: 80px;
   }
@@ -1412,6 +1449,8 @@
 }
 
 @media (max-width: 700px) {
+  .catalog-layout { grid-template-columns: 1fr; gap: 22px; }
+  .phone-filter__brands { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .announcement {
     font-size: 8px;
     letter-spacing: .12em;
