@@ -23,7 +23,7 @@ CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulama
 - Telefon markası, modeli ve kılıf türüne göre filtreleme
 - Stok durumuna göre filtreleme
 - Gerçek ürün görselleri
-- Örnek veri kümesinde 40 telefon kılıfı görseli
+- Örnek veri kümesinde 44 telefon kılıfı görseli
 - Sepete ürün ekleme
 - Sepette ürün adedi artırma ve azaltma
 - Sepet toplam tutarını hesaplama
@@ -183,16 +183,18 @@ Gerekirse `VITE_API_BASE_URL` ortam değişkeniyle API adresi değiştirilebilir
 
 Örnek ürünleri eklemeden önce veritabanının ve uygun satıcı mağazasının hazırlanması gerekir.
 Telefon filtre tabloları `backend/migrations/002_phone_filters.sql` ile oluşturulur.
-40 demo ürünün ABO ilanlarından doğrulanan telefon ve kılıf türü etiketleri
+44 demo ürünün ABO ilanlarından doğrulanan telefon ve kılıf türü etiketleri
 `backend/data/phone_case_labels.json` dosyasındadır. Mevcut ürünleri çoğaltmadan
 etiketlemek için, ürünleri ekledikten sonra `backend` klasöründe çalıştırın:
 
 ```bash
+python scripts/seed_phone_cases.py --only-new
 python scripts/assign_phone_case_labels.py
 python scripts/assign_phone_case_labels.py --verify-only
 ```
 
-Bu betik yalnızca `CaseMarket Test Magazasi` mağazasının 40 yerel görselli
+`--only-new` mevcut ürünlerin fiyatını ve stokunu değiştirmez. Etiketleme betiği
+yalnızca `CaseMarket Test Magazasi` mağazasının 44 yerel görselli
 ürününü hedefler; ürün adını, fiyatını, stokunu ve görsel adresini değiştirmez.
 Telefon uyumluluğu, kılıfı üreten markadan değil, kaynak ilanın uyumlu telefon
 bilgisinden alınır. Yerel ürün adları ve stoklar demo verisidir.

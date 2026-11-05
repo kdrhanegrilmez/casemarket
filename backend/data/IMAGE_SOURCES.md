@@ -1,6 +1,6 @@
 # Telefon kılıfı görsel kaynakları
 
-Bu katalogdaki 40 görsel **Amazon Berkeley Objects (ABO)** veri setinin katalog
+Bu katalogdaki 44 görsel **Amazon Berkeley Objects (ABO)** veri setinin katalog
 görsellerinden seçildi. Veri setinin güncel resmi sayfası tüm çalışmayı **Creative
 Commons Attribution 4.0 International (CC BY 4.0)** ile yayımlar.
 
@@ -12,9 +12,10 @@ Commons Attribution 4.0 International (CC BY 4.0)** ile yayımlar.
   Collins, Shubham Goel ve Jitendra Malik.
 - Erişim tarihi: 20 Ekim 2026
 
-Özgün JPEG dosyaları yerel katalog için en uzun kenarı en fazla 1000 piksel olacak
-şekilde küçültülmüş ve WebP biçimine dönüştürülmüştür. Bu işlem teknik bir biçim ve
-boyut optimizasyonudur. Ürün adları, Türkçe açıklamalar, TL fiyatları ve stoklar
+İlk 40 JPEG dosyası yerel katalog için en uzun kenarı en fazla 1000 piksel olacak
+şekilde küçültülmüş ve WebP biçimine dönüştürülmüştür; son dört görsel özgün JPEG
+biçiminde tutulur. WebP dönüşümü teknik bir biçim ve boyut optimizasyonudur.
+Ürün adları, Türkçe açıklamalar, TL fiyatları ve stoklar
 CaseMarket demo verisidir; ABO satış verisi veya gerçek piyasa bilgisi değildir.
 Marka ve model bilgisi Türkçe demo adlarına eklenmemiştir.
 Kaynak ilanlardan doğrulanan telefon uyumlulukları ve kılıf türleri
@@ -63,3 +64,7 @@ Kaynak ilanlardan doğrulanan telefon uyumlulukları ve kılıf türleri
 | case-038.webp | B07TH15X46 | 71LGV6YP1YL | https://amazon-berkeley-objects.s3.amazonaws.com/images/original/c0/c09c0669.jpg |
 | case-039.webp | B07TC5V3TP | 81zw4zYNpxL | https://amazon-berkeley-objects.s3.amazonaws.com/images/original/f2/f2406417.jpg |
 | case-040.webp | B07TRG8VTD | 71FTogng51L | https://amazon-berkeley-objects.s3.amazonaws.com/images/original/71/7121df5d.jpg |
+| case-041.jpg | B07TRVR4PZ | 81Sx5VI+TuL | https://amazon-berkeley-objects.s3.amazonaws.com/images/original/8e/8eff68d7.jpg |
+| case-042.jpg | B081HNQR8W | 61AbbzVL-CL | https://amazon-berkeley-objects.s3.amazonaws.com/images/original/da/da12ba08.jpg |
+| case-043.jpg | B087RHRW1Q | 71thOOCzSwL | https://amazon-berkeley-objects.s3.amazonaws.com/images/original/73/73a87a9a.jpg |
+| case-044.jpg | B081HNDYRR | 51A3yOkggCL | https://amazon-berkeley-objects.s3.amazonaws.com/images/original/79/790e3473.jpg |

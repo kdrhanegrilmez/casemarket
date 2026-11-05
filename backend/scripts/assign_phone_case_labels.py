@@ -1,4 +1,4 @@
-"""Apply the reviewed ABO phone labels to the 40 existing demo products."""
+"""Apply the reviewed ABO phone labels to the demo catalog products."""
 
 import argparse
 import json
@@ -25,13 +25,13 @@ def load_labels():
     source_text = (DATA_DIR / "IMAGE_SOURCES.md").read_text(encoding="utf-8")
     source_asins = {
         f"/products/{image}": asin
-        for image, asin in re.findall(r"\| (case-\d{3}\.webp) \| (B[A-Z0-9]{9}) \|", source_text)
+        for image, asin in re.findall(r"\| (case-\d{3}\.(?:webp|jpg)) \| (B[A-Z0-9]{9}) \|", source_text)
     }
     product_urls = {product["image_url"] for product in products}
     label_urls = [label["image_url"] for label in labels]
 
-    if len(labels) != 40 or len(set(label_urls)) != len(labels) or set(label_urls) != product_urls:
-        raise ValueError("Etiketler 40 mevcut demo urunuyle bire bir eslesmeli.")
+    if not labels or len(set(label_urls)) != len(labels) or set(label_urls) != product_urls:
+        raise ValueError("Etiketler mevcut demo urunleriyle bire bir eslesmeli.")
 
     for label in labels:
         image_url = label["image_url"]

@@ -51,7 +51,7 @@ def validate_category(cursor, category_id: int | None) -> None:
         raise RuntimeError(f"Kategori bulunamadi: {category_id}")
 
 
-def seed(store_name: str) -> tuple[int, int, int]:
+def seed(store_name: str, only_new: bool = False) -> tuple[int, int, int]:
     products = load_products()
     added = updated = skipped = 0
 
@@ -89,6 +89,10 @@ def seed(store_name: str) -> tuple[int, int, int]:
                     raise RuntimeError(
                         f"Birden fazla mevcut urun ayni gorsel yolunu kullaniyor: {product['image_url']}"
                     )
+
+                if existing and only_new:
+                    skipped += 1
+                    continue
 
                 if not existing:
                     cursor.execute(
@@ -136,8 +140,9 @@ def seed(store_name: str) -> tuple[int, int, int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="ABO telefon kilifi katalog verilerini yukler.")
     parser.add_argument("--store-name", default=DEFAULT_STORE_NAME)
+    parser.add_argument("--only-new", action="store_true", help="Mevcut urunlerin fiyat ve stokunu degistirme.")
     args = parser.parse_args()
-    seed(args.store_name)
+    seed(args.store_name, args.only_new)
 
 
 if __name__ == "__main__":
