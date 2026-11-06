@@ -115,7 +115,7 @@ function App() {
   // URUN DETAYI
   const [selectedId, setSelectedId] = useState(productIdFromPath)
   const [detail, setDetail] = useState(null)
-  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(() => productIdFromPath() !== null)
   const [detailError, setDetailError] = useState('')
 
   // ARAMA VE FILTRELER
@@ -168,6 +168,20 @@ function App() {
 const [ordersOpen, setOrdersOpen] = useState(
   () => ['/orders', '/account'].includes(window.location.pathname)
 )
+
+  function refreshCatalog() {
+    setLoading(true)
+    setError('')
+    setReloadKey((key) => key + 1)
+  }
+
+  const selectProduct = useCallback((id) => {
+    if (id === selectedId) return
+    setDetail(null)
+    setDetailError('')
+    setDetailLoading(id !== null)
+    setSelectedId(id)
+  }, [selectedId])
 
   // JWT SURESI DOLDUGUNDA KULLANICIYI OTOMATIK CIKAR
   const expireSession = useCallback((expectedToken) => {
@@ -227,10 +241,7 @@ const [ordersOpen, setOrdersOpen] = useState(
 
   // OTURUM KONTROLU
   useEffect(() => {
-    if (!accessToken) {
-      setCurrentUser(null)
-      return
-    }
+    if (!accessToken) return undefined
 
     const controller = new AbortController()
 
@@ -337,9 +348,6 @@ useEffect(() => {
   useEffect(() => {
     const controller = new AbortController()
 
-    setLoading(true)
-    setError('')
-
     fetch(`${API_BASE_URL}/api/catalog/products`, {
       signal: controller.signal,
     })
@@ -399,16 +407,9 @@ useEffect(() => {
 
   // URUN DETAYINI GETIR
   useEffect(() => {
-    if (selectedId === null) {
-      setDetail(null)
-      return
-    }
+    if (selectedId === null) return undefined
 
     const controller = new AbortController()
-
-    setDetail(null)
-    setDetailLoading(true)
-    setDetailError('')
 
     fetch(
       `${API_BASE_URL}/api/catalog/products/${selectedId}`,
@@ -449,12 +450,11 @@ useEffect(() => {
   // TARAYICI GERI / ILERI TUSLARI
   useEffect(() => {
     function handleHistory() {
-      setSelectedId(productIdFromPath())
+      selectProduct(productIdFromPath())
       setOrdersOpen(['/orders', '/account'].includes(window.location.pathname))
       setAccountTab(window.location.pathname === '/orders' ? 'history' : 'profile')
       setAuthMode(null)
       setSellerPanelOpen(false)
-      setDetail(null)
       setCartOpen(false)
       window.scrollTo(0, 0)
     }
@@ -464,7 +464,7 @@ useEffect(() => {
     return () => {
       window.removeEventListener('popstate', handleHistory)
     }
-  }, [])
+  }, [selectProduct])
 
   // KOLEKSIYONA DONUS
   useEffect(() => {
@@ -616,7 +616,7 @@ useEffect(() => {
 
     window.history.pushState({}, '', `/products/${id}`)
 
-    setSelectedId(id)
+    selectProduct(id)
     window.scrollTo(0, 0)
   }
 
@@ -626,14 +626,13 @@ useEffect(() => {
     setAuthMode(null)
     setSellerPanelOpen(false)
     //ana sayfaya dönerken kataloğu backend'den yüklememiz greiyor
-    setReloadKey((previousValue)=>previousValue+1)
+    refreshCatalog()
 
     const url = toCollection ? '/#koleksiyon' : '/'
 
     window.history.pushState({}, '', url)
 
-    setSelectedId(null)
-    setDetail(null)
+    selectProduct(null)
 
     if (toCollection) {
       window.requestAnimationFrame(() => {
@@ -698,8 +697,7 @@ useEffect(() => {
     }
 
     setAuthMode(null)
-    setSelectedId(null)
-    setDetail(null)
+    selectProduct(null)
     setCartOpen(false)
     setSellerPanelOpen(true)
 
@@ -715,8 +713,7 @@ useEffect(() => {
 
     setAuthMode(null)
     setSellerPanelOpen(false)
-    setSelectedId(null)
-    setDetail(null)
+    selectProduct(null)
     setCartOpen(false)
     setAccountTab(tab)
     setOrdersOpen(true)
@@ -870,7 +867,7 @@ async function handleCreateOrder() {
     // Sipariş başarılı ise sepeti temizle.
     setCart([])
     setCompleteOrder(order)
-    setReloadKey((previous) => previous + 1)
+    refreshCatalog()
 
     // Tarayici alert'i yerine kendi mesajimizi goster.
     setCheckoutDialog({
@@ -1046,6 +1043,7 @@ async function handleCreateOrder() {
           {authMode ? (
 
             <AuthPage
+              key={authMode}
               mode={authMode}
               onModeChange={setAuthMode}
               onAuthenticated={handleAuthenticated}
@@ -1395,7 +1393,7 @@ async function handleCreateOrder() {
                   {filtersError && (
                     <p className="phone-filter__note" role="alert">
                       {filtersError}{' '}
-                      <button className="phone-filter__retry" type="button" onClick={() => setReloadKey((key) => key + 1)}>Tekrar dene</button>
+                      <button className="phone-filter__retry" type="button" onClick={refreshCatalog}>Tekrar dene</button>
                     </p>
                   )}
 
@@ -1594,9 +1592,7 @@ async function handleCreateOrder() {
                   <button
                     className="button button--dark"
                     type="button"
-                    onClick={() =>
-                      setReloadKey((key) => key + 1)
-                    }
+                    onClick={refreshCatalog}
                   >
                     Tekrar dene
                   </button>

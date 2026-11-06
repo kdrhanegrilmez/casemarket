@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import './AuthPage.css'
 
 const API_BASE_URL =
@@ -29,12 +29,6 @@ function AuthPage({ mode, onModeChange, onAuthenticated }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-
-  useEffect(() => {
-    setError('')
-    setSuccess('')
-    setPassword('')
-  }, [mode])
 
   async function handleSubmit(event) {
     event.preventDefault()

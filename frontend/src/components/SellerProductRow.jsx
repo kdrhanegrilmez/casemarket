@@ -73,6 +73,10 @@ function SellerProductRow({ product, token, onUpdated, catalogFilters }) {
     const newStock = Number(stock)
     const newImageUrl = imageUrl.trim()
     const newName = name.trim()
+    const originalModelIds = product.model_ids || []
+    const compatibilityChanged = categoryId !== String(product.category_id || '') ||
+      modelIds.length !== originalModelIds.length ||
+      modelIds.some((id) => !originalModelIds.includes(id))
 
     if (
       newName.length < 3 ||
@@ -82,8 +86,7 @@ function SellerProductRow({ product, token, onUpdated, catalogFilters }) {
       newPrice <= 0 ||
       !Number.isInteger(newStock) ||
       newStock < 0 ||
-      !categoryId ||
-      modelIds.length === 0
+      (compatibilityChanged && (!categoryId || modelIds.length === 0))
     ) {
       setError('Ürün bilgilerini, kılıf türünü ve en az bir telefon modelini seç.')
       return
@@ -106,8 +109,10 @@ function SellerProductRow({ product, token, onUpdated, catalogFilters }) {
             stock: newStock,
             name: newName,
             image_url: newImageUrl || null,
-            category_id: Number(categoryId),
-            model_ids: modelIds,
+            ...(compatibilityChanged ? {
+              category_id: Number(categoryId),
+              model_ids: modelIds,
+            } : {}),
           }),
         }
       )
