@@ -73,3 +73,18 @@ def get_current_user(
         "email": user[2],
         "role": user[3],
     }
+
+
+#Admin yetkisi kontrolü
+
+def require_admin(
+    current_user = Depends(get_current_user)
+):
+    #Giriş yapan kullanıcı admin yetkisi var mı
+
+    if current_user["role"]!= "admin":
+        raise HTTPException(
+            status_code=403,
+            detail ="Admin yetkilisi değilsiniz",
+        )
+    return current_user

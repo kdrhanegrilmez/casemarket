@@ -17,9 +17,39 @@ CREATE TABLE IF NOT EXISTS sellers(
                                   REFERENCES users(id), --foreign key yaptık
     store_name VARCHAR(120) NOT NULL,
     description TEXT,
+    approval_status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CONSTRAINT sellers_approval_status_check
+        CHECK (approval_status IN ('pending', 'approved', 'rejected')),
+    reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMPTZ,
+    review_reason TEXT,
+    commission_rate_percent NUMERIC(5, 2)
+        CONSTRAINT sellers_commission_rate_check
+        CHECK (commission_rate_percent IS NULL OR
+               commission_rate_percent BETWEEN 0 AND 100),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 
 );
+
+CREATE INDEX IF NOT EXISTS idx_sellers_approval_status ON sellers(approval_status);
+
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    actor_user_id BIGINT NOT NULL REFERENCES users(id),
+    action VARCHAR(80) NOT NULL,
+    target_type VARCHAR(40) NOT NULL,
+    target_id BIGINT NOT NULL,
+    before_data JSONB,
+    after_data JSONB,
+    reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_target
+ON admin_audit_logs(target_type, target_id);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created_at
+ON admin_audit_logs(created_at DESC);
 
 --Ürün kategorileri
 

@@ -13,6 +13,7 @@ from database import open_db_pool, close_db_pool
 from routers import catalog, login, me, products, register, seller
 from routers import seller_products, orders, account, checkout
 from routers import seller_orders
+from routers import admin_sellers
 
 
 
@@ -85,3 +86,4 @@ app.include_router(seller_orders.router)
 app.include_router(orders.router)
 app.include_router(account.router)
 app.include_router(checkout.router)
+app.include_router(admin_sellers.router)

@@ -40,18 +40,16 @@ def create_seller(
         with get_connection() as connection:
             with connection.cursor() as cursor:
 
-                # Kullaniciyi satici rolune gecir.
+                # Basvuru incelenene kadar kullanici musteri olarak kalir.
                 cursor.execute(
                     """
-                    UPDATE users
-                    SET role = 'seller'
-                    WHERE id = %s AND role = 'customer'
-                    RETURNING id
+                    SELECT role FROM users WHERE id = %s FOR UPDATE
                     """,
                     (current_user["id"],),
                 )
 
-                if cursor.fetchone() is None:
+                role_row = cursor.fetchone()
+                if role_row is None or role_row[0] != "customer":
                     raise HTTPException(
                         status_code=409,
                         detail="Bu hesap yeni bir magaza acamaz.",
@@ -61,9 +59,9 @@ def create_seller(
                 cursor.execute(
                     """
                     INSERT INTO sellers
-                        (owner_user_id, store_name, description)
-                    VALUES (%s, %s, %s)
-                    RETURNING id, store_name, description
+                        (owner_user_id, store_name, description, approval_status)
+                    VALUES (%s, %s, %s, 'pending')
+                    RETURNING id, store_name, description, approval_status
                     """,
                     (
                         current_user["id"],
@@ -85,6 +83,7 @@ def create_seller(
         "owner_user_id": current_user["id"],
         "store_name": seller[1],
         "description": seller[2],
+        "approval_status": seller[3],
     }
 
 

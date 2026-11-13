@@ -46,15 +46,16 @@ def create_order(
                 cursor.execute(
                     """
                     SELECT
-                        id,
-                        seller_id,
-                        name,
-                        price,
-                        stock,
-                        is_active
-                    FROM products
-                    WHERE id = %s
-                    FOR UPDATE
+                        p.id,
+                        p.seller_id,
+                        p.name,
+                        p.price,
+                        p.stock,
+                        p.is_active
+                    FROM products AS p
+                    JOIN sellers AS s ON s.id = p.seller_id
+                    WHERE p.id = %s AND s.approval_status = 'approved'
+                    FOR UPDATE OF p
                     """,
                     (item.product_id,),
                 )

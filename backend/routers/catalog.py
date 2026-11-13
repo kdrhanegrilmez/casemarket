@@ -45,6 +45,7 @@ def get_catalog_products():
                 FROM products AS p
                 JOIN sellers AS s ON s.id = p.seller_id
                 WHERE p.is_active = TRUE
+                  AND s.approval_status = 'approved'
                 ORDER BY p.id
                 """
             )
@@ -87,6 +88,7 @@ def get_catalog_product_detail(product_id: int):
                 WHERE
                     p.id = %s
                     AND p.is_active = TRUE
+                    AND s.approval_status = 'approved'
                 """,
                 (product_id,),
             )

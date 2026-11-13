@@ -12,6 +12,7 @@ CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulama
 - Sepette adres ve demo ödeme yöntemi seçilerek sipariş tamamlanır. Gerçek ödeme alınmaz; tam kart numarası ve güvenlik kodu saklanmaz. Canlı ödeme için ayrı bir ödeme sağlayıcısı entegrasyonu gerekir.
 - Mevcut PostgreSQL veritabanını kullanan kurulumlarda bir kez `cd backend && python -m scripts.apply_account_migration` çalıştırılmalıdır. Yeni kurulumlarda `backend/schema.sql` bu alanları içerir.
 - Satıcı kargo durumu için mevcut veritabanında bir kez `cd backend && python scripts/apply_seller_shipping_migration.py` çalıştırılmalıdır. Yeni kurulumlarda sütun `backend/schema.sql` içindedir.
+- Mağaza başvurusu ve admin işlem kaydı için mevcut veritabanında `cd backend && python scripts/apply_seller_approval_migration.py` çalıştırılmalıdır. Yeni kurulumlarda alanlar `backend/schema.sql` içindedir. Önceden açılmış mağazalar onaylı kabul edilir; yeni başvurular admin kararı bekler.
 
 ## Mevcut Özellikler
 
@@ -217,7 +218,7 @@ bilgisinden alınır. Yerel ürün adları ve stoklar demo verisidir.
 
 | Metot | Endpoint | Açıklama |
 | --- | --- | --- |
-| POST | `/api/sellers` | Mağaza oluşturma |
+| POST | `/api/sellers` | Onay bekleyen mağaza başvurusu oluşturma |
 | GET | `/api/sellers/me` | Kendi mağazasını görüntüleme |
 | GET | `/api/sellers/me/products` | Ürünlerini listeleme |
 | POST | `/api/sellers/me/products` | Yeni ürün ekleme |
@@ -226,6 +227,15 @@ bilgisinden alınır. Yerel ürün adları ve stoklar demo verisidir.
 | PATCH | `/api/sellers/me/products/{product_id}/compatibility` | Kategori ve model eşleştirmesini ayrı güncelleme |
 | GET | `/api/sellers/me/orders` | Satıcının sipariş kalemlerini listeleme |
 | PATCH | `/api/sellers/me/orders/{order_id}/items/{item_id}/shipping` | Kargo durumunu ilerletme |
+
+### Admin mağaza başvuruları
+
+| Metot | Endpoint | Açıklama |
+| --- | --- | --- |
+| GET | `/api/admin/seller-application?status=pending` | Başvuruları duruma göre listeleme |
+| PATCH | `/api/admin/seller-application/{seller_id}/review` | `decision` (`approved` veya `rejected`) ve gerekçeyle karar verme |
+
+Bu uç noktalar `admin` rolü gerektirir. Ret kararında `reason` zorunludur; onayda kullanıcı satıcı rolüne geçer. Admin hesabı oluşturma ve yönetim arayüzü henüz eklenmemiştir.
 
 ### Catalog
 
