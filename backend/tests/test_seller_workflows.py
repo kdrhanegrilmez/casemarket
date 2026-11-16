@@ -70,7 +70,7 @@ class SellerProductTests(unittest.TestCase):
         self.assertTrue(any("INSERT INTO PRODUCT_COMPATIBLE_MODELS" in sql for sql, _ in cursor.queries))
 
     def test_list_returns_compatible_model_ids(self):
-        cursor = Cursor(many=[[(12, "Kılıf", Decimal("49.90"), 4, 1, True, "Mağaza", "/case.jpg", [18, 19])]])
+        cursor = Cursor(many=[[(12, "Kılıf", Decimal("49.90"), 4, 1, True, "Mağaza", "/case.jpg", None, None, [18, 19])]])
         with patch("routers.seller_products.get_connection", return_value=Connection(cursor)):
             result = get_my_products(SELLER)
         self.assertEqual(result[0]["model_ids"], [18, 19])

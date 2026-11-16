@@ -7,6 +7,8 @@ import {createOrder} from "./api/orders.js";
 import AccountPage from './components/AccountPage'
 import { accountRequest } from './api/account'
 import SiteDialog from './components/SiteDialog'
+import AdminDashboard from './components/AdminDashboard'
+import CustomerSupportWidget from './components/CustomerSupportWidget'
 
 
 const API_BASE_URL = (
@@ -160,6 +162,9 @@ function App() {
   const [accessToken, setAccessToken] = useState(
     () => sessionStorage.getItem('casemarket-token')
   )
+  const [supportOpen, setSupportOpen] = useState(false)
+  const [supportChannel, setSupportChannel] = useState('support')
+  const [supportProductId, setSupportProductId] = useState(null)
 
   // SATICI PANELI
   const [sellerPanelOpen, setSellerPanelOpen] = useState(false)
@@ -914,6 +919,18 @@ async function handleCreateOrder() {
     rail.scrollBy({ left: direction * Math.max(rail.clientWidth * 0.8, 240), behavior: 'smooth' })
   }
 
+  if (window.location.pathname === '/admin' && currentUser?.role === 'admin' && accessToken) {
+    return (
+      <AdminDashboard
+        token={accessToken}
+        userId={currentUser.id}
+        onBack={() => window.location.assign('/')}
+        onLogout={handleLogout}
+        onUnauthorized={expireSession}
+      />
+    )
+  }
+
   return (
     <div className="site">
 
@@ -1058,6 +1075,7 @@ async function handleCreateOrder() {
               onUserChange={setCurrentUser}
               onLogout={handleLogout}
               onSellerOpen={openSellerPanel}
+              onAdminOpen={() => window.location.assign('/admin')}
               initialTab={accountTab}
               onBack={() => goHome(true)}
             />
@@ -1073,6 +1091,7 @@ async function handleCreateOrder() {
             token={accessToken}
             user={currentUser}
             onBack={() => openOrders('seller')}
+            onUnauthorized={expireSession}
           />
 
         ) : selectedId !== null ? (
@@ -1194,6 +1213,11 @@ async function handleCreateOrder() {
                     <span>Sepete ekle</span>
                     <span aria-hidden="true">↗</span>
                   </button>
+
+                  {(!currentUser || currentUser.role === 'customer') && <button type="button" className="detail-content__question"
+                    onClick={() => { setSupportProductId(detail.id); setSupportChannel('questions'); setSupportOpen(true) }}>
+                    Bu ürün hakkında satıcıya soru sor ↗
+                  </button>}
 
                   <div className="detail-note">
                     <span>◈</span>
@@ -2076,6 +2100,17 @@ async function handleCreateOrder() {
 
 
 {/* SIPARIS ONAYI VE SONUC MESAJI */}
+{currentUser?.role !== 'seller' && currentUser?.role !== 'admin' && <CustomerSupportWidget
+  token={accessToken}
+  user={currentUser}
+  open={supportOpen}
+  channel={supportChannel}
+  productId={supportProductId}
+  onOpenChange={setSupportOpen}
+  onChannelChange={setSupportChannel}
+  onLogin={() => openAuth('login')}
+  onUnauthorized={expireSession}
+/>}
 <SiteDialog
   open={checkoutDialog !== null}
   variant={checkoutDialog?.variant}

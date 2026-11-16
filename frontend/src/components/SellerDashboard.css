@@ -101,6 +101,30 @@
   margin-bottom: 55px;
 }
 
+.seller-notifications { margin: 0 0 28px; border: 1px solid #e4ddd1; background: #fffefa; }
+.seller-communication { margin-bottom: 30px; }
+.seller-communication__tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.seller-communication__tabs button { padding: 10px 14px; border: 1px solid #d8d0c6; border-radius: 7px; background: #fffefa; color: #535a51; font-size: 12px; cursor: pointer; }
+.seller-communication__tabs button.active { border-color: #27362e; background: #27362e; color: #fff; }
+.seller-communication__tabs .seller-communication__refresh { margin-left: auto; }
+.seller-notifications__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 26px; border-bottom: 1px solid #e9e3da; }
+.seller-notifications__heading span { color: #9c8e7c; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }
+.seller-notifications__heading h2 { margin: 7px 0 0; font-size: 25px; letter-spacing: -1px; }
+.seller-notifications__heading > strong { padding: 7px 10px; border-radius: 100px; background: #f2e9df; color: #7a4b35; font-size: 11px; white-space: nowrap; }
+.seller-notifications__empty, .seller-notifications__error { margin: 0; padding: 20px 26px; color: #73776e; font-size: 13px; }
+.seller-notifications__error { color: #a34841; }
+.seller-notifications ul { margin: 0; padding: 0; list-style: none; }
+.seller-notifications li { padding: 18px 26px; border-top: 1px solid #eee9e2; }
+.seller-notifications li:first-child { border-top: 0; }
+.seller-notifications li.unread { border-left: 3px solid #a57148; background: #fcf8f2; }
+.seller-notifications__meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.seller-notifications__meta strong { color: #895c39; font-size: 12px; }
+.seller-notifications__meta time { color: #8b9087; font-size: 11px; }
+.seller-notifications li p { margin: 8px 0 0; color: #454b43; font-size: 13px; line-height: 1.5; }
+.seller-notifications li button { margin-top: 12px; padding: 7px 10px; border: 1px solid #cfbea8; border-radius: 6px; background: #fffefa; color: #684932; font-size: 11px; cursor: pointer; }
+.seller-notifications li button:disabled { opacity: .5; cursor: default; }
+.seller-row-moderation { display: block; max-width: 260px; margin-top: 6px; color: #a34841; line-height: 1.4; }
+
 .seller-dashboard__stats > div {
   display: flex;
   flex-direction: column;

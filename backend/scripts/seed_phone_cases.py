@@ -125,7 +125,7 @@ def seed(store_name: str, only_new: bool = False) -> tuple[int, int, int]:
                         price = %s,
                         stock = %s,
                         image_url = %s,
-                        is_active = %s
+                        is_active = CASE WHEN admin_hidden_at IS NULL THEN %s ELSE FALSE END
                     WHERE id = %s AND seller_id = %s
                     """,
                     (*values, row[0], seller_id),

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import './SellerDashboard.css'
 import './components.css'
 import SellerProductRow from './SellerProductRow.jsx'
+import ThreadCenter from './ThreadCenter.jsx'
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
@@ -13,10 +14,14 @@ const shippingLabels = { pending: 'Bekliyor', preparing: 'Hazırlanıyor', shipp
 const nextShippingStatus = { pending: 'preparing', preparing: 'shipped', shipped: 'delivered' }
 const formatPrice = (value) => Number(value).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })
 
-function SellerDashboard({ token, user, onBack }) {
+function SellerDashboard({ token, user, onBack, onUnauthorized }) {
   const [store, setStore] = useState(null)
   const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
+  const [notifications, setNotifications] = useState([])
+  const [notificationError, setNotificationError] = useState('')
+  const [notificationBusyId, setNotificationBusyId] = useState(null)
+  const [communicationTab, setCommunicationTab] = useState('notifications')
   const [shippingBusyId, setShippingBusyId] = useState(null)
   const [shippingError, setShippingError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -52,7 +57,7 @@ function SellerDashboard({ token, user, onBack }) {
           Authorization: `Bearer ${token}`,
         }
 
-        const [storeResponse, productsResponse, ordersResponse] =
+        const [storeResponse, productsResponse, ordersResponse, notificationsResponse] =
           await Promise.all([
             fetch(`${API_BASE_URL}/api/sellers/me`, {
               headers,
@@ -66,32 +71,38 @@ function SellerDashboard({ token, user, onBack }) {
               headers,
               signal: controller.signal,
             }),
+            fetch(`${API_BASE_URL}/api/sellers/me/notifications`, {
+              headers,
+              signal: controller.signal,
+            }),
           ])
 
         if (
           storeResponse.status === 401 ||
           productsResponse.status === 401 ||
-          ordersResponse.status === 401
+          ordersResponse.status === 401 ||
+          notificationsResponse.status === 401
         ) {
           throw new Error(
             'Oturum süren dolmuş. Çıkış yapıp yeniden giriş yap.'
           )
         }
 
-        if (!storeResponse.ok || !productsResponse.ok || !ordersResponse.ok) {
+        if (!storeResponse.ok || !productsResponse.ok || !ordersResponse.ok || !notificationsResponse.ok) {
           throw new Error(
             'Mağaza bilgileri getirilemedi.'
           )
         }
 
-        const [storeData, productData, orderData] =
+        const [storeData, productData, orderData, notificationData] =
           await Promise.all([
             storeResponse.json(),
             productsResponse.json(),
             ordersResponse.json(),
+            notificationsResponse.json(),
           ])
 
-        if (!Array.isArray(productData) || !Array.isArray(orderData)) {
+        if (!Array.isArray(productData) || !Array.isArray(orderData) || !Array.isArray(notificationData)) {
           throw new Error('Ürün listesi geçersiz.')
         }
 
@@ -99,6 +110,7 @@ function SellerDashboard({ token, user, onBack }) {
           setStore(storeData)
           setProducts(productData)
           setOrders(orderData)
+          setNotifications(notificationData)
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -296,6 +308,26 @@ function SellerDashboard({ token, user, onBack }) {
     }
   }
 
+  async function markNotificationRead(notificationId) {
+    setNotificationBusyId(notificationId)
+    setNotificationError('')
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sellers/me/notifications/${notificationId}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(typeof result?.detail === 'string' ? result.detail : 'Bildirim güncellenemedi.')
+      setNotifications((current) => current.map((notification) => notification.id === notificationId
+        ? { ...notification, read_at: result.read_at }
+        : notification))
+    } catch (err) {
+      setNotificationError(err instanceof Error ? err.message : 'Bildirim güncellenemedi.')
+    } finally {
+      setNotificationBusyId(null)
+    }
+  }
+
   const activeCount = products.filter(
     (product) => product.is_active
   ).length
@@ -377,6 +409,36 @@ function SellerDashboard({ token, user, onBack }) {
               CM
             </span>
           </div>
+
+          <section className="seller-communication" aria-label="Satıcı iletişim merkezi">
+            <div className="seller-communication__tabs" role="tablist" aria-label="İletişim bölümleri">
+              <button type="button" role="tab" aria-selected={communicationTab === 'notifications'} className={communicationTab === 'notifications' ? 'active' : ''}
+                onClick={() => setCommunicationTab('notifications')}>Bildirimler</button>
+              <button type="button" role="tab" aria-selected={communicationTab === 'support'} className={communicationTab === 'support' ? 'active' : ''}
+                onClick={() => setCommunicationTab('support')}>Yardım ve destek</button>
+              <button type="button" role="tab" aria-selected={communicationTab === 'questions'} className={communicationTab === 'questions' ? 'active' : ''}
+                onClick={() => setCommunicationTab('questions')}>Ürün soruları</button>
+              <button type="button" className="seller-communication__refresh" onClick={() => setRefreshKey((value) => value + 1)}>↻ Yenile</button>
+            </div>
+            {communicationTab === 'notifications' ? <div className="seller-notifications">
+            <div className="seller-notifications__heading">
+              <div><span>MAĞAZA BİLDİRİMLERİ</span><h2>Bildirimler</h2></div>
+              <strong>{notifications.filter((notification) => !notification.read_at).length} okunmamış</strong>
+            </div>
+            {notificationError && <p className="seller-notifications__error" role="alert">{notificationError}</p>}
+            {notifications.length === 0 ? (
+              <p className="seller-notifications__empty">Henüz bildirimin yok.</p>
+            ) : <ul>
+              {notifications.map((notification) => <li key={notification.id} className={notification.read_at ? '' : 'unread'}>
+                <div className="seller-notifications__meta"><strong>Admin’den · {notification.admin_name}</strong><time dateTime={notification.created_at}>{new Date(notification.created_at).toLocaleString('tr-TR')}</time></div>
+                <p><b>Ürün #{notification.product_id}</b> ({notification.product_name}) yayından kaldırıldı.</p>
+                <p><b>Gerekçe:</b> {notification.reason}</p>
+                {!notification.read_at && <button type="button" disabled={notificationBusyId === notification.id} onClick={() => markNotificationRead(notification.id)}>Okundu işaretle</button>}
+              </li>)}
+            </ul>}
+            </div> : <ThreadCenter key={communicationTab} token={token} audience="seller"
+              channel={communicationTab} userId={user.id} onUnauthorized={onUnauthorized} />}
+          </section>
 
           <div className="seller-dashboard__stats">
             <div>

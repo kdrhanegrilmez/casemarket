@@ -13,6 +13,8 @@ CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulama
 - Mevcut PostgreSQL veritabanını kullanan kurulumlarda bir kez `cd backend && python -m scripts.apply_account_migration` çalıştırılmalıdır. Yeni kurulumlarda `backend/schema.sql` bu alanları içerir.
 - Satıcı kargo durumu için mevcut veritabanında bir kez `cd backend && python scripts/apply_seller_shipping_migration.py` çalıştırılmalıdır. Yeni kurulumlarda sütun `backend/schema.sql` içindedir.
 - Mağaza başvurusu ve admin işlem kaydı için mevcut veritabanında `cd backend && python scripts/apply_seller_approval_migration.py` çalıştırılmalıdır. Yeni kurulumlarda alanlar `backend/schema.sql` içindedir. Önceden açılmış mağazalar onaylı kabul edilir; yeni başvurular admin kararı bekler.
+- Admin ürün kaldırma ve satıcı bildirimleri için mevcut veritabanında bir kez `cd backend && python scripts/apply_product_moderation_migration.py` çalıştırılmalıdır. Yeni kurulumlarda alanlar `backend/schema.sql` içindedir.
+- Müşteri desteği, satıcı desteği, ürün soruları ve ürün moderasyonu konuşmaları için mevcut veritabanında bir kez `cd backend && python scripts/apply_support_chat_migration.py` çalıştırılmalıdır. Yeni kurulumlarda tablolar `backend/schema.sql` içindedir.
 
 ## Mevcut Özellikler
 
@@ -234,8 +236,17 @@ bilgisinden alınır. Yerel ürün adları ve stoklar demo verisidir.
 | --- | --- | --- |
 | GET | `/api/admin/seller-application?status=pending` | Başvuruları duruma göre listeleme |
 | PATCH | `/api/admin/seller-application/{seller_id}/review` | `decision` (`approved` veya `rejected`) ve gerekçeyle karar verme |
+| PATCH | `/api/admin/stores/{seller_id}/commission` | Onaylı mağazanın komisyon oranını yüzde olarak ayarlama (0–100, en fazla iki ondalık) |
+| PATCH | `/api/admin/products/{product_id}/remove` | Gerekçeyle ürünü yayından kaldırma ve satıcıya bildirim gönderme |
 
-Bu uç noktalar `admin` rolü gerektirir. Ret kararında `reason` zorunludur; onayda kullanıcı satıcı rolüne geçer. Admin hesabı oluşturma ve yönetim arayüzü henüz eklenmemiştir.
+Bu uç noktalar `admin` rolü gerektirir. Ret kararında `reason` zorunludur; onayda kullanıcı satıcı rolüne geçer. Admin hesabı oluşturma arayüzü henüz eklenmemiştir.
+
+Komisyon oranı mağaza bazında saklanır ve her değişiklik admin denetim kaydına yazılır. Sipariş bazında komisyon tahakkuku ve satıcı ödeme hesabı henüz uygulanmamıştır.
+
+Satıcı paneli `GET /api/sellers/me/notifications` üzerinden admin bildirimlerini gösterir; `PATCH /api/sellers/me/notifications/{notification_id}/read` ile bildirim okundu işaretlenir. Admin tarafından kaldırılan ürün satıcı tarafından yeniden yayınlanamaz.
+
+Admin ürün kaldırdığında gerekçe satıcıyla ürün moderasyonu konuşmasına yazılır. Satıcı aynı konuşmadan yanıt verebilir; admin `PATCH /api/admin/products/{product_id}/restore` ile mesaj ekleyerek ürünü yeniden yayına alabilir. `/api/support` altındaki konuşmalar müşteri desteği, satıcı desteği ve ürün soruları olarak ayrılır.
+Müşteri site sağ altındaki yardım kutusundan destek mesajı gönderir; ürün detayından satıcıya soru sorabilir. Admin panelindeki Destek alanı müşteri ve satıcı konuşmalarını ayrı gösterir. Satıcı panelinde bildirimler, admin desteği ve ürün soruları ayrı sekmelerdedir.
 
 ### Catalog
 

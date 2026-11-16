@@ -7,16 +7,17 @@ from psycopg.types.json import Jsonb
 from core.dependencies import require_admin
 from database import get_connection
 
+
 router = APIRouter(
     prefix="/api/admin/seller-application",
     tags=["admin-seller-application"],
 )
 
 
-#Admin Onay veya Ret Kararı
+# Admin Onay veya Ret Kararı
 
 class SellerApplicationReview(BaseModel):
-    decision: Literal["approved","rejected"]
+    decision: Literal["approved", "rejected"]
 
     reason: str | None = Field(
         default=None,
@@ -25,8 +26,7 @@ class SellerApplicationReview(BaseModel):
 
     @model_validator(mode="after")
     def validate_reason(self):
-        #Reddedilen başvurularda gerekçe zorunludur
-
+        # Reddedilen başvurularda gerekçe zorunludur
         if self.decision == "rejected":
             if not self.reason or not self.reason.strip():
                 raise ValueError(
@@ -35,17 +35,13 @@ class SellerApplicationReview(BaseModel):
 
         return self
 
+
 # 1. Mağaza Başvurularını Listele
 
 @router.get("")
-
 def list_seller_applications(
-        status: Literal[
-            "pending",
-            "approved",
-            "rejected",
-        ] ="pending",
-        current_admin: dict = Depends(require_admin),
+    status: Literal["pending", "approved", "rejected"] = "pending",
+    current_admin: dict = Depends(require_admin),
 ):
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -71,28 +67,28 @@ def list_seller_applications(
 
             rows = cursor.fetchall()
 
-    return [{
-        "seller_id": row[0],
-        "store_name": row[1],
-        "description": row[2],
-        "approval_status": row[3],
-        "created_at": row[4],
-        "owner_user_id": row[5],
-        "owner_name": row[6],
-        "owner_email": row[7],
-    }
+    return [
+        {
+            "seller_id": row[0],
+            "store_name": row[1],
+            "description": row[2],
+            "approval_status": row[3],
+            "created_at": row[4],
+            "owner_user_id": row[5],
+            "owner_name": row[6],
+            "owner_email": row[7],
+        }
         for row in rows
     ]
 
 
 # 2. Mağza başvurusunu onayla veya Reddet
 
-
 @router.patch("/{seller_id}/review")
 def review_seller_application(
-        seller_id: int,
-        data: SellerApplicationReview,
-        current_admin : dict = Depends(require_admin),
+    seller_id: int,
+    data: SellerApplicationReview,
+    current_admin: dict = Depends(require_admin),
 ):
     reason = data.reason.strip() if data.reason else None
 
@@ -101,7 +97,6 @@ def review_seller_application(
             # Magazayi ve sahibini kilitle.
             # Eszamanli iki adminin ayni basvuruyu
             # farkli kararlarla guncellemesini engeller.
-
             cursor.execute(
                 """
                 SELECT
@@ -117,14 +112,14 @@ def review_seller_application(
                 FOR UPDATE OF s, u
                 """,
                 (seller_id,),
-
             )
+
             application = cursor.fetchone()
 
             if application is None:
                 raise HTTPException(
                     status_code=404,
-                    detail= "Mağza başvurusu bulunamadı."
+                    detail="Mağza başvurusu bulunamadı.",
                 )
 
             (
@@ -135,19 +130,18 @@ def review_seller_application(
                 old_role,
             ) = application
 
-            #Yanlizca bekleyen başvurular incelenebilir
+            # Yanlizca bekleyen başvurular incelenebilir
             if old_status != "pending":
                 raise HTTPException(
                     status_code=409,
-                    detail= "Bu başvuru daha önceden sonuçlandırılmış",
+                    detail="Bu başvuru daha önceden sonuçlandırılmış",
                 )
 
             if old_role != "customer":
                 raise HTTPException(
                     status_code=409,
-                    detail="başvuru sahibinin kullanıcı rolü uygun değil"
+                    detail="başvuru sahibinin kullanıcı rolü uygun değil",
                 )
-
 
             # Magazanin onay durumunu guncelle.
             cursor.execute(
@@ -168,8 +162,6 @@ def review_seller_application(
                 ),
             )
 
-
-
             # Satici rolu yalnizca onay sonrasinda verilir.
             new_role = old_role
 
@@ -183,6 +175,7 @@ def review_seller_application(
                     """,
                     (owner_user_id,),
                 )
+
                 if cursor.fetchone() is None:
                     raise HTTPException(
                         status_code=409,
@@ -191,11 +184,10 @@ def review_seller_application(
 
                 new_role = "seller"
 
-
-            #Admin işlemini denetim kaydına ekle.
+            # Admin işlemini denetim kaydına ekle.
             cursor.execute(
                 """
-                INSERT INTO admin_audit_logs(
+                INSERT INTO admin_audit_logs (
                     actor_user_id,
                     action,
                     target_type,
@@ -203,16 +195,16 @@ def review_seller_application(
                     before_data,
                     after_data,
                     reason
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-
                 (
                     current_admin["id"],
                     f"seller.{data.decision}",
                     "seller",
                     application_id,
-                    #JSONB: POSTGRESQL de JSON verilerini optimize eder,
-                    #ayrıştırılmış binary formatta depolamak için kullanılan bir veri türüdür.
+                    # JSONB: POSTGRESQL de JSON verilerini optimize eder,
+                    # ayrıştırılmış binary formatta depolamak için kullanılan bir veri türüdür.
                     Jsonb({
                         "approval_status": old_status,
                         "user_role": old_role,
@@ -223,7 +215,6 @@ def review_seller_application(
                     }),
                     reason,
                 ),
-
             )
 
     return {
@@ -232,5 +223,5 @@ def review_seller_application(
         "approval_status": data.decision,
         "owner_user_id": owner_user_id,
         "user_role": new_role,
-        "message": "Mağza başvurusu sonuçlandırıldı."
+        "message": "Mağza başvurusu sonuçlandırıldı.",
     }

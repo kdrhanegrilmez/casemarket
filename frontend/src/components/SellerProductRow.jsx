@@ -197,6 +197,7 @@ function SellerProductRow({ product, token, onUpdated, catalogFilters }) {
 
 
         <small>Ürün #{product.id}</small>
+        {product.admin_hidden_at && <small className="seller-row-moderation">Admin gerekçesi: {product.admin_hidden_reason}</small>}
         {!editing && modelNames.length > 0 && <small className="seller-row-models">{modelNames.join(' · ')}</small>}
 
          {/* Düzenle butonuna basılınca görsel alanını göster. */}
@@ -315,7 +316,7 @@ function SellerProductRow({ product, token, onUpdated, catalogFilters }) {
               : 'seller-status seller-status--inactive'
           }
         >
-          {product.is_active ? 'Yayında' : 'Pasif'}
+          {product.admin_hidden_at ? 'Admin kaldırdı' : product.is_active ? 'Yayında' : 'Pasif'}
         </span>
       </td>
 
@@ -358,7 +359,7 @@ function SellerProductRow({ product, token, onUpdated, catalogFilters }) {
               <button
                 type="button"
                 className="seller-row-button"
-                disabled={busy}
+                disabled={busy || Boolean(product.admin_hidden_at)}
                 onClick={toggleVisibility}
               >
                 {product.is_active

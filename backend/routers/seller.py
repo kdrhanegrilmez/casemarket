@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException
 from psycopg.errors import UniqueViolation
 
@@ -39,7 +38,6 @@ def create_seller(
     try:
         with get_connection() as connection:
             with connection.cursor() as cursor:
-
                 # Basvuru incelenene kadar kullanici musteri olarak kalir.
                 cursor.execute(
                     """
@@ -49,6 +47,7 @@ def create_seller(
                 )
 
                 role_row = cursor.fetchone()
+
                 if role_row is None or role_row[0] != "customer":
                     raise HTTPException(
                         status_code=409,
@@ -89,36 +88,101 @@ def create_seller(
 
 @router.get("/me")
 def get_my_store(
-        current_user: dict=Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
-    #Sadece satıcı rolündeki kullanıcılara erişmeliyiz
+    # Sadece satıcı rolündeki kullanıcılara erişmeliyiz
     if current_user["role"] != "seller":
         raise HTTPException(
-                status_code=403,
-                detail="Bu işlem için satıcı hesabı gerekir."
+            status_code=403,
+            detail="Bu işlem için satıcı hesabı gerekir.",
         )
-    #Mağzaya giriş yapan kullanıcıya göre bulma:
+
+    # Mağzaya giriş yapan kullanıcıya göre bulma:
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT id, owner_user_id, store_name, description
                 FROM sellers
-                    WHERE owner_user_id = %s
+                WHERE owner_user_id = %s
                 """,
                 (current_user["id"],),
             )
 
-            store=cursor.fetchone()
+            store = cursor.fetchone()
+
     if store is None:
         raise HTTPException(
             status_code=404,
-            detail="Mağza bulunamadı"
+            detail="Mağza bulunamadı",
         )
 
-    return{
+    return {
         "id": store[0],
         "owner_user_id": store[1],
         "store_name": store[2],
         "description": store[3],
     }
+
+
+@router.get("/me/notifications")
+def get_my_notifications(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "seller":
+        raise HTTPException(status_code=403, detail="Bu işlem için satıcı hesabı gerekir.")
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT n.id, n.product_id, p.name, n.reason,
+                       a.full_name, n.created_at, n.read_at
+                FROM seller_notifications AS n
+                JOIN products AS p ON p.id = n.product_id
+                JOIN users AS a ON a.id = n.actor_user_id
+                WHERE n.recipient_user_id = %s
+                  AND n.kind = 'product_removed_by_admin'
+                ORDER BY n.created_at DESC, n.id DESC
+                LIMIT 50
+                """,
+                (current_user["id"],),
+            )
+            rows = cursor.fetchall()
+
+    return [
+        {
+            "id": row[0],
+            "product_id": row[1],
+            "product_name": row[2],
+            "reason": row[3],
+            "admin_name": row[4],
+            "created_at": row[5],
+            "read_at": row[6],
+        }
+        for row in rows
+    ]
+
+
+@router.patch("/me/notifications/{notification_id}/read")
+def mark_notification_read(
+    notification_id: int,
+    current_user: dict = Depends(get_current_user),
+):
+    if current_user["role"] != "seller":
+        raise HTTPException(status_code=403, detail="Bu işlem için satıcı hesabı gerekir.")
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE seller_notifications
+                SET read_at = COALESCE(read_at, NOW())
+                WHERE id = %s AND recipient_user_id = %s
+                RETURNING id, read_at
+                """,
+                (notification_id, current_user["id"]),
+            )
+            notification = cursor.fetchone()
+
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Bildirim bulunamadı.")
+    return {"id": notification[0], "read_at": notification[1]}

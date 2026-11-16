@@ -11,7 +11,7 @@ const tabs = [
   ['history', 'Sipariş geçmişi'],
 ]
 
-export default function AccountPage({ token, user, onUserChange, onBack, onSellerOpen, onLogout, initialTab = 'profile' }) {
+export default function AccountPage({ token, user, onUserChange, onBack, onSellerOpen, onAdminOpen, onLogout, initialTab = 'profile' }) {
   const [tab, setTab] = useState(initialTab)
   const [addresses, setAddresses] = useState([])
   const [methods, setMethods] = useState([])
@@ -63,7 +63,11 @@ export default function AccountPage({ token, user, onUserChange, onBack, onSelle
     }
   }
 
-  const visibleTabs = user.role === 'seller' ? [...tabs, ['seller', 'Satıcı paneli']] : tabs
+  const visibleTabs = user.role === 'seller'
+    ? [...tabs, ['seller', 'Satıcı paneli']]
+    : user.role === 'admin'
+      ? [...tabs, ['admin', 'Admin paneli']]
+      : tabs
 
   return (
     <section className="account-page">
@@ -88,7 +92,14 @@ export default function AccountPage({ token, user, onUserChange, onBack, onSelle
             <form key={user.id} onSubmit={(event) => submit(event, '/profile', onUserChange)} className="account-form">
               <label>Ad soyad<input name="full_name" defaultValue={user.full_name} minLength="2" required /></label>
               <label>E-posta<input name="email" type="email" defaultValue={user.email} required /></label>
-              <label>Hesap türü<input value={user.role === 'seller' ? 'Satıcı' : 'Müşteri'} disabled readOnly /></label>
+              <label>
+                  Hesap türü
+                  <input
+                    value={{ admin: 'Yönetici', seller: 'Satıcı', customer: 'Müşteri' }[user.role] ?? user.role}
+                    disabled
+                    readOnly
+                  />
+              </label>
               <button className="button button--dark" disabled={busy}>Bilgileri kaydet</button>
             </form>
           </div>}
@@ -133,6 +144,11 @@ export default function AccountPage({ token, user, onUserChange, onBack, onSelle
             <span className="overline">MAĞAZAM</span><h2>Satıcı paneli</h2>
             <p>Ürünlerini ekle, stoklarını güncelle ve yayındaki ürünlerini yönet.</p>
             <button type="button" className="button button--dark" onClick={onSellerOpen}>Satıcı paneline gir ↗</button>
+          </div>}
+          {tab === 'admin' && user.role === 'admin' && <div className="account-panel">
+            <span className="overline">YÖNETİM</span><h2>Admin paneli</h2>
+            <p>Siparişleri, ürünleri, mağazaları ve kullanıcıları incele.</p>
+            <button type="button" className="button button--dark" onClick={onAdminOpen}>Admin paneline gir ↗</button>
           </div>}
         </div>
       </div>

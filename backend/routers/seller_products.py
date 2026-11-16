@@ -167,6 +167,8 @@ def get_my_products(
                     p.is_active,
                     s.store_name,
                     p.image_url,
+                    p.admin_hidden_at,
+                    p.admin_hidden_reason,
                     ARRAY(
                         SELECT pcm.phone_model_id
                         FROM product_compatible_models AS pcm
@@ -196,7 +198,9 @@ def get_my_products(
             "is_active": row[5],
             "store_name": row[6],
             "image_url": row[7],
-            "model_ids": row[8],
+            "admin_hidden_at": row[8],
+            "admin_hidden_reason": row[9],
+            "model_ids": row[10],
         })
 
     return products
@@ -342,6 +346,7 @@ def update_my_product_visibility(
                     p.id = %s
                     AND p.seller_id = s.id
                     AND s.owner_user_id = %s
+                    AND (%s = FALSE OR p.admin_hidden_at IS NULL)
                 RETURNING
                     p.id,
                     p.name,
@@ -351,12 +356,29 @@ def update_my_product_visibility(
                     data.is_active,
                     product_id,
                     current_user["id"],
+                    data.is_active,
                 ),
             )
 
             product = cursor.fetchone()
 
             if product is None:
+                if data.is_active:
+                    cursor.execute(
+                        """
+                        SELECT p.admin_hidden_at
+                        FROM products AS p
+                        JOIN sellers AS s ON s.id = p.seller_id
+                        WHERE p.id = %s AND s.owner_user_id = %s
+                        """,
+                        (product_id, current_user["id"]),
+                    )
+                    hidden = cursor.fetchone()
+                    if hidden is not None and hidden[0] is not None:
+                        raise HTTPException(
+                            status_code=409,
+                            detail="Bu ürün admin tarafından yayından kaldırıldı; yeniden yayınlanamaz.",
+                        )
                 raise HTTPException(
                     status_code=404,
                     detail="Urun bulunamadi veya bu urun size ait degil.",

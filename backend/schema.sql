@@ -86,8 +86,67 @@ CREATE TABLE IF NOT EXISTS products (
 
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
+    admin_hidden_at TIMESTAMPTZ,
+    admin_hidden_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    admin_hidden_reason TEXT,
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS seller_notifications (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    recipient_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    actor_user_id BIGINT NOT NULL REFERENCES users(id),
+    product_id BIGINT NOT NULL REFERENCES products(id),
+    kind VARCHAR(40) NOT NULL CHECK (kind IN ('product_removed_by_admin')),
+    reason TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    read_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_seller_notifications_recipient
+ON seller_notifications(recipient_user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS support_threads (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    kind VARCHAR(30) NOT NULL CHECK (kind IN (
+        'customer_support', 'seller_support', 'product_question', 'product_moderation'
+    )),
+    customer_user_id BIGINT REFERENCES users(id),
+    seller_user_id BIGINT REFERENCES users(id),
+    product_id BIGINT REFERENCES products(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (
+        (kind = 'customer_support' AND customer_user_id IS NOT NULL AND seller_user_id IS NULL AND product_id IS NULL)
+        OR (kind = 'seller_support' AND seller_user_id IS NOT NULL AND customer_user_id IS NULL AND product_id IS NULL)
+        OR (kind = 'product_question' AND customer_user_id IS NOT NULL AND seller_user_id IS NOT NULL AND product_id IS NOT NULL)
+        OR (kind = 'product_moderation' AND seller_user_id IS NOT NULL AND customer_user_id IS NULL AND product_id IS NOT NULL)
+    )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_support_customer_thread
+ON support_threads(customer_user_id) WHERE kind = 'customer_support';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_support_seller_thread
+ON support_threads(seller_user_id) WHERE kind = 'seller_support';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_support_question_thread
+ON support_threads(customer_user_id, product_id) WHERE kind = 'product_question';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_support_moderation_thread
+ON support_threads(product_id) WHERE kind = 'product_moderation';
+CREATE INDEX IF NOT EXISTS idx_support_threads_seller
+ON support_threads(seller_user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_threads_updated
+ON support_threads(updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS support_messages (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    thread_id BIGINT NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+    sender_user_id BIGINT NOT NULL REFERENCES users(id),
+    body VARCHAR(2000) NOT NULL CHECK (length(trim(body)) > 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_support_messages_thread
+ON support_messages(thread_id, id);
 
 --Müşteri siparişleri
 CREATE TABLE IF NOT EXISTS orders (

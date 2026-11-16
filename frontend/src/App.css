@@ -33,6 +33,9 @@
   border: 0;
 }
 
+.detail-content__question { display: block; width: 100%; margin: 12px 0 24px; padding: 13px 16px; border: 1px solid #cfc6b8; background: transparent; color: #4c574c; text-align: left; font: inherit; font-size: 13px; cursor: pointer; }
+.detail-content__question:hover { border-color: #26382c; background: #f0eee8; }
+
 /* UST DUYURU */
 
 .announcement {
