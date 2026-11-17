@@ -105,6 +105,34 @@ paid -> preparing -> shipped -> delivered
 
 Kurulum sırası ve elle test akışı: [Destek sistemi kontrol rehberi](docs/support-system.md).
 
+### Yeni migration eklendiğinde çalıştırılacak komutlar
+
+Backend'i durdurun. Repo kökünden mevcut destek şemasının eksik adımlarını
+sırayla uygulayın; daha önce uygulanmış ön koşulları atlayabilirsiniz:
+
+```bash
+cd backend
+python scripts/apply_seller_approval_migration.py
+python scripts/apply_product_moderation_migration.py
+python scripts/apply_support_chat_migration.py
+python scripts/apply_support_read_status_migration.py
+python -m unittest
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Yeni bir migration eklendiğinde ilgili `python scripts/apply_*_migration.py`
+komutunu bağımlılıklarından sonra, backend'i yeniden başlatmadan önce çalıştırın.
+Yalnızca kodu güncellemek mevcut veritabanını değiştirmez.
+`support_threads.status` veya `support_thread_reads` eksikse backend,
+`Migration uygulanmamış: apply_support_read_status_migration.py` mesajıyla
+başlamayı reddeder. Migration komutunu çalıştırıp backend'i yeniden başlatın.
+
+Çalışma sırasında beklenmeyen hatalar `500` ve `{"detail": "Sunucu hatası"}`
+JSON yanıtıyla döner; tam traceback backend loguna yazılır. İzin verilen
+frontend adresleri bu hata yanıtını CORS üzerinden okuyabilir. Backend kapalıysa
+veya başlangıç kontrolünü geçememişse tarayıcı hâlâ `Failed to fetch` gösterebilir;
+bu durumda backend terminalindeki başlangıç hatasını kontrol edin.
+
 ## 8. Güvenlik, test ve yayınlama
 
 - [x] JWT doğrulaması
