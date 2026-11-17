@@ -6,14 +6,15 @@ from pydantic import ValidationError
 
 from core.dependencies import require_admin
 from main import app
-from routers.admin_sellers import SellerApplicationReview, review_seller_application
+from routers.admin_sellers import SellerAccessRevocation, SellerApplicationReview, list_seller_applications, review_seller_application, revoke_seller_access
 from routers.seller import create_seller
 from schemas.sellers import SellerCreate
 
 
 class FakeCursor:
-    def __init__(self, rows):
+    def __init__(self, rows, many=()):
         self.rows = iter(rows)
+        self.many = many
         self.queries = []
 
     def __enter__(self):
@@ -28,6 +29,9 @@ class FakeCursor:
 
     def fetchone(self):
         return next(self.rows)
+
+    def fetchall(self):
+        return self.many
 
 
 class FakeConnection:
@@ -102,6 +106,63 @@ class SellerApprovalTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as error:
             require_admin({"id": 7, "role": "customer"})
         self.assertEqual(error.exception.status_code, 403)
+
+    def test_revocation_changes_role_and_store_status_with_audit(self):
+        cursor = FakeCursor([(12, 7, "Mağaza", "approved", "seller"), (7,)])
+        connection = FakeConnection(cursor)
+        with patch("routers.admin_sellers.get_connection", return_value=connection):
+            result = revoke_seller_access(12, SellerAccessRevocation(reason="  Kural ihlali  "), {"id": 2, "role": "admin"})
+        self.assertTrue(connection.committed)
+        self.assertEqual(result["user_role"], "customer")
+        self.assertEqual(result["approval_status"], "pending")
+        self.assertIn("FOR UPDATE OF S, U", cursor.queries[0][0])
+        self.assertIn("SET ROLE = 'CUSTOMER'", cursor.queries[1][0])
+        self.assertEqual(cursor.queries[2][1], (2, "Kural ihlali", 12))
+        self.assertEqual(cursor.queries[3][1][1], "seller.access_revoked")
+        self.assertEqual(cursor.queries[3][1][4].obj, {"approval_status": "approved", "user_role": "seller"})
+
+    def test_revocation_requires_admin_and_reason(self):
+        with self.assertRaises(ValidationError):
+            SellerAccessRevocation(reason="     ")
+        for role in ("customer", "seller"):
+            with self.assertRaises(HTTPException) as error:
+                revoke_seller_access(12, SellerAccessRevocation(reason="Kural ihlali"), {"id": 7, "role": role})
+            self.assertEqual(error.exception.status_code, 403)
+
+    def test_revocation_rejects_missing_or_ineligible_store(self):
+        for row, code in ((None, 404), ((12, 7, "Mağaza", "pending", "customer"), 409),
+                          ((12, 7, "Mağaza", "approved", "admin"), 409)):
+            cursor = FakeCursor([row])
+            connection = FakeConnection(cursor)
+            with patch("routers.admin_sellers.get_connection", return_value=connection):
+                with self.assertRaises(HTTPException) as error:
+                    revoke_seller_access(12, SellerAccessRevocation(reason="Kural ihlali"), {"id": 2, "role": "admin"})
+            self.assertEqual(error.exception.status_code, code)
+            self.assertTrue(connection.rolled_back)
+            self.assertEqual(len(cursor.queries), 1)
+
+    def test_revocation_audit_failure_rolls_back_role_and_store(self):
+        class AuditFailureCursor(FakeCursor):
+            def execute(self, sql, params):
+                super().execute(sql, params)
+                if "INSERT INTO ADMIN_AUDIT_LOGS" in self.queries[-1][0]:
+                    raise RuntimeError("audit failed")
+        cursor = AuditFailureCursor([(12, 7, "Mağaza", "approved", "seller"), (7,)])
+        connection = FakeConnection(cursor)
+        with patch("routers.admin_sellers.get_connection", return_value=connection):
+            with self.assertRaises(RuntimeError):
+                revoke_seller_access(12, SellerAccessRevocation(reason="Kural ihlali"), {"id": 2, "role": "admin"})
+        self.assertTrue(connection.rolled_back)
+
+    def test_revocation_route_is_registered(self):
+        self.assertIn("patch", app.openapi()["paths"]["/api/admin/seller-application/{seller_id}/revoke"])
+
+    def test_application_list_includes_revocation_reason(self):
+        cursor = FakeCursor([], many=[(12, "Mağaza", None, "pending", None, 7, "Satıcı", "s@example.com", "2026-11-17", "Kural ihlali")])
+        with patch("routers.admin_sellers.get_connection", return_value=FakeConnection(cursor)):
+            result = list_seller_applications("pending", {"id": 2, "role": "admin"})
+        self.assertEqual(result[0]["review_reason"], "Kural ihlali")
+        self.assertEqual(result[0]["reviewed_at"], "2026-11-17")
 
 
 if __name__ == "__main__":

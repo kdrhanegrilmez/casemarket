@@ -125,6 +125,28 @@ def get_my_store(
     }
 
 
+@router.get("/my-application")
+def get_my_application(current_user: dict = Depends(get_current_user)):
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, store_name, description, approval_status, created_at,
+                       reviewed_at, review_reason
+                FROM sellers WHERE owner_user_id = %s
+                """,
+                (current_user["id"],),
+            )
+            row = cursor.fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row[0], "store_name": row[1], "description": row[2],
+        "approval_status": row[3], "created_at": row[4],
+        "reviewed_at": row[5], "review_reason": row[6],
+    }
+
+
 @router.get("/me/notifications")
 def get_my_notifications(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "seller":

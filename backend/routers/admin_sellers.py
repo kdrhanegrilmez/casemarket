@@ -1,7 +1,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from psycopg.types.json import Jsonb
 
 from core.dependencies import require_admin
@@ -12,6 +12,64 @@ router = APIRouter(
     prefix="/api/admin/seller-application",
     tags=["admin-seller-application"],
 )
+
+
+class SellerAccessRevocation(BaseModel):
+    reason: str = Field(min_length=5, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def trim_reason(cls, value):
+        value = value.strip()
+        if len(value) < 5:
+            raise ValueError("Yetki geri alma gerekçesi en az 5 karakter olmalıdır.")
+        return value
+
+
+@router.patch("/{seller_id}/revoke")
+def revoke_seller_access(
+    seller_id: int,
+    data: SellerAccessRevocation,
+    current_admin: dict = Depends(require_admin),
+):
+    require_admin(current_admin)
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT s.id, s.owner_user_id, s.store_name, s.approval_status, u.role
+                   FROM sellers AS s JOIN users AS u ON u.id = s.owner_user_id
+                   WHERE s.id = %s FOR UPDATE OF s, u""",
+                (seller_id,),
+            )
+            store = cursor.fetchone()
+            if store is None:
+                raise HTTPException(status_code=404, detail="Mağaza bulunamadı.")
+            _, owner_id, store_name, status, role = store
+            if status != "approved" or role != "seller":
+                raise HTTPException(status_code=409, detail="Bu mağazanın geri alınabilecek satıcı yetkisi yok.")
+            cursor.execute(
+                """UPDATE users SET role = 'customer'
+                   WHERE id = %s AND role = 'seller' RETURNING id""",
+                (owner_id,),
+            )
+            if cursor.fetchone() is None:
+                raise HTTPException(status_code=409, detail="Kullanıcı rolü değişti. Listeyi yenileyin.")
+            cursor.execute(
+                """UPDATE sellers SET approval_status = 'pending', reviewed_by = %s,
+                   reviewed_at = NOW(), review_reason = %s WHERE id = %s""",
+                (current_admin["id"], data.reason, seller_id),
+            )
+            cursor.execute(
+                """INSERT INTO admin_audit_logs
+                   (actor_user_id, action, target_type, target_id, before_data, after_data, reason)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                (current_admin["id"], "seller.access_revoked", "seller", seller_id,
+                 Jsonb({"approval_status": status, "user_role": role}),
+                 Jsonb({"approval_status": "pending", "user_role": "customer"}), data.reason),
+            )
+    return {"seller_id": seller_id, "store_name": store_name,
+            "approval_status": "pending", "user_role": "customer",
+            "message": "Satıcı yetkisi geri alındı. Mağaza yeniden incelemeye alındı."}
 
 
 # Admin Onay veya Ret Kararı
@@ -55,7 +113,9 @@ def list_seller_applications(
                     s.created_at,
                     u.id,
                     u.full_name,
-                    u.email
+                    u.email,
+                    s.reviewed_at,
+                    s.review_reason
                 FROM sellers AS s
                 JOIN users AS u
                     ON u.id = s.owner_user_id
@@ -77,6 +137,8 @@ def list_seller_applications(
             "owner_user_id": row[5],
             "owner_name": row[6],
             "owner_email": row[7],
+            "reviewed_at": row[8],
+            "review_reason": row[9],
         }
         for row in rows
     ]
