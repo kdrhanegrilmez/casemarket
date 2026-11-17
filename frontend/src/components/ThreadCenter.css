@@ -17,6 +17,7 @@
 .thread-center__list button:hover, .thread-center__list button.active { background: var(--thread-bg); }
 .thread-center__list button.active { box-shadow: inset 3px 0 var(--thread-accent); }
 .thread-center__list strong { font-size: 12px; line-height: 1.35; }
+.thread-center__badge { justify-self: start; padding: 2px 7px; border-radius: 12px; background: var(--thread-accent); color: var(--thread-bg); font-size: 11px; }
 .thread-center__list small, .thread-center__list span { overflow: hidden; color: var(--thread-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .thread-center__conversation { display: flex; flex-direction: column; min-width: 0; min-height: 420px; background: var(--thread-bg); }
 .thread-center__placeholder { margin: auto; padding: 20px; color: var(--thread-muted); text-align: center; font-size: 12px; }
