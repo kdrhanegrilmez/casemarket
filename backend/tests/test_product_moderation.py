@@ -12,9 +12,9 @@ from schemas.seller_products import SellerProductVisibilityUpdate
 
 
 class FakeCursor:
-    def __init__(self, rows, fail_notification=False):
+    def __init__(self, rows, fail_message=False):
         self.rows = iter(rows)
-        self.fail_notification = fail_notification
+        self.fail_message = fail_message
         self.queries = []
 
     def __enter__(self):
@@ -26,8 +26,8 @@ class FakeCursor:
     def execute(self, sql, params):
         normalized = " ".join(sql.upper().split())
         self.queries.append((normalized, params))
-        if self.fail_notification and normalized.startswith("INSERT INTO SELLER_NOTIFICATIONS"):
-            raise RuntimeError("notification failed")
+        if self.fail_message and normalized.startswith("INSERT INTO SUPPORT_MESSAGES"):
+            raise RuntimeError("message failed")
 
     def fetchone(self):
         return next(self.rows)
@@ -57,7 +57,7 @@ class ProductModerationTests(unittest.TestCase):
             ProductRemoval(reason="   ")
         self.assertEqual(ProductRemoval(reason="  Yanlış kategori  ").reason, "Yanlış kategori")
 
-    def test_removal_writes_seller_notification_and_audit_atomically(self):
+    def test_removal_writes_only_moderation_message_and_audit_atomically(self):
         cursor = FakeCursor([{
             "id": 12, "name": "Kılıf", "is_active": True,
             "admin_hidden_at": None, "owner_user_id": 7,
@@ -68,12 +68,14 @@ class ProductModerationTests(unittest.TestCase):
 
         self.assertTrue(connection.committed)
         self.assertFalse(result["is_active"])
-        self.assertEqual(len(cursor.queries), 7)
+        self.assertEqual(len(cursor.queries), 6)
         self.assertIn("UPDATE PRODUCTS SET IS_ACTIVE = FALSE", cursor.queries[1][0])
-        self.assertEqual(cursor.queries[2][1], (7, 2, 12, "Yanıltıcı açıklama"))
+        self.assertFalse(any("INSERT INTO SELLER_NOTIFICATIONS" in sql for sql, _ in cursor.queries))
         self.assertEqual(result["thread_id"], 30)
-        self.assertIn("INSERT INTO SUPPORT_MESSAGES", cursor.queries[4][0])
-        self.assertIn("INSERT INTO ADMIN_AUDIT_LOGS", cursor.queries[6][0])
+        self.assertIn("INSERT INTO SUPPORT_MESSAGES", cursor.queries[3][0])
+        self.assertEqual(cursor.queries[3][1], (30, 2, "Ürün #12 yayından kaldırıldı. Gerekçe: Yanıltıcı açıklama"))
+        self.assertIn("STATUS = 'OPEN'", cursor.queries[4][0])
+        self.assertIn("INSERT INTO ADMIN_AUDIT_LOGS", cursor.queries[5][0])
 
     def test_admin_can_restore_product_and_reply_in_same_thread(self):
         cursor = FakeCursor([{
@@ -89,6 +91,8 @@ class ProductModerationTests(unittest.TestCase):
         self.assertEqual(result["thread_id"], 30)
         self.assertIn("ADMIN_HIDDEN_AT = NULL", cursor.queries[1][0])
         self.assertIn("INSERT INTO SUPPORT_MESSAGES", cursor.queries[3][0])
+        self.assertEqual(cursor.queries[3][1], (30, 2, "Ürün #12 yeniden yayına alındı. Fiyat incelendi, yayınlandı."))
+        self.assertIn("STATUS = 'OPEN'", cursor.queries[4][0])
         self.assertIn("INSERT INTO ADMIN_AUDIT_LOGS", cursor.queries[5][0])
 
     def test_repeated_removal_is_rejected(self):
@@ -102,11 +106,11 @@ class ProductModerationTests(unittest.TestCase):
         self.assertEqual(error.exception.status_code, 409)
         self.assertEqual(len(cursor.queries), 1)
 
-    def test_notification_failure_rolls_back_product_change(self):
+    def test_message_failure_rolls_back_product_change(self):
         cursor = FakeCursor([{
             "id": 12, "name": "Kılıf", "is_active": True,
             "admin_hidden_at": None, "owner_user_id": 7,
-        }], fail_notification=True)
+        }, {"id": 30}], fail_message=True)
         connection = FakeConnection(cursor)
         with patch("routers.admin_dashboard.get_connection", return_value=connection):
             with self.assertRaises(RuntimeError):

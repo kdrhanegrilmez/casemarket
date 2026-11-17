@@ -272,14 +272,6 @@ def remove_product_from_sale(
             )
             cursor.execute(
                 """
-                INSERT INTO seller_notifications (
-                    recipient_user_id, actor_user_id, product_id, kind, reason
-                ) VALUES (%s, %s, %s, 'product_removed_by_admin', %s)
-                """,
-                (product["owner_user_id"], current_admin["id"], product_id, data.reason),
-            )
-            cursor.execute(
-                """
                 INSERT INTO support_threads (kind, seller_user_id, product_id)
                 VALUES ('product_moderation', %s, %s)
                 ON CONFLICT DO NOTHING RETURNING id
@@ -302,7 +294,7 @@ def remove_product_from_sale(
                 """,
                 (thread_id, current_admin["id"], f"Ürün #{product_id} yayından kaldırıldı. Gerekçe: {data.reason}"),
             )
-            cursor.execute("UPDATE support_threads SET updated_at = NOW() WHERE id = %s", (thread_id,))
+            cursor.execute("UPDATE support_threads SET updated_at = NOW(), status = 'open', closed_at = NULL WHERE id = %s", (thread_id,))
             cursor.execute(
                 """
                 INSERT INTO admin_audit_logs (
@@ -384,7 +376,7 @@ def restore_product_to_sale(
                 """,
                 (thread["id"], current_admin["id"], f"Ürün #{product_id} yeniden yayına alındı. {data.message}"),
             )
-            cursor.execute("UPDATE support_threads SET updated_at = NOW() WHERE id = %s", (thread["id"],))
+            cursor.execute("UPDATE support_threads SET updated_at = NOW(), status = 'open', closed_at = NULL WHERE id = %s", (thread["id"],))
             cursor.execute(
                 """
                 INSERT INTO admin_audit_logs (
