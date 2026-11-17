@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS support_threads (
     customer_user_id BIGINT REFERENCES users(id),
     seller_user_id BIGINT REFERENCES users(id),
     product_id BIGINT REFERENCES products(id),
+    status VARCHAR(10) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+    closed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CHECK (
@@ -147,6 +149,15 @@ CREATE TABLE IF NOT EXISTS support_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_support_messages_thread
 ON support_messages(thread_id, id);
+CREATE INDEX IF NOT EXISTS idx_support_messages_sender_created
+ON support_messages(sender_user_id, created_at);
+
+CREATE TABLE IF NOT EXISTS support_thread_reads (
+    thread_id BIGINT NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    last_read_message_id BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (thread_id, user_id)
+);
 
 --Müşteri siparişleri
 CREATE TABLE IF NOT EXISTS orders (
