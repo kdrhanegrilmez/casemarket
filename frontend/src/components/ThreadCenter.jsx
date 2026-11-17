@@ -4,7 +4,6 @@ import ThreadList from './ThreadList'
 import ThreadView from './ThreadView'
 import MessageComposer from './MessageComposer'
 import ModerationRestoreForm from './ModerationRestoreForm'
-import RefreshButton from './RefreshButton'
 import useVisiblePolling from './useVisiblePolling'
 import './ThreadCenter.css'
 
@@ -24,6 +23,7 @@ export default function ThreadCenter({ token, audience, channel, userId, initial
   const [creating, setCreating] = useState(false)
   const [newProductId, setNewProductId] = useState(null)
   const questionProductId = productId || newProductId
+  const initialPending = useRef(initialThreadId)
   const currentDetail = detail?.thread.id === selectedId ? detail : null
   const completed = currentDetail?.thread.status === 'closed'
 
@@ -45,7 +45,8 @@ export default function ThreadCenter({ token, audience, channel, userId, initial
           : item.kind === 'product_question' && item.product_id === questionProductId)
         setSelectedId(existing?.id ?? null)
         if (existing) setCreating(false)
-      } else setSelectedId((current) => current ?? relevant[0]?.id ?? null)
+      } else setSelectedId((current) => current && (relevant.some((item) => item.id === current) || initialPending.current === current)
+        ? current : relevant[0]?.id ?? null)
       // Başka bir ekrandan yeniden açılmış seçili görüşmenin polling'ini başlat.
       setDetail((current) => {
         const updated = relevant.find((item) => item.id === current?.thread.id)
@@ -59,6 +60,10 @@ export default function ThreadCenter({ token, audience, channel, userId, initial
       const value = await getThread(token, selectedId, signal)
       if (signal.aborted) return
       setDetail(value)
+      initialPending.current = null
+      if (value.thread.status === 'closed' && status === 'open') {
+        setStatus('closed'); setLoaded(false); setThreads([])
+      }
       setThreads((current) => current.map((item) => item.id === selectedId ? { ...item, ...value.thread, unread_count: 0 } : item))
       const latestId = value.messages.at(-1)?.id ?? 0
       if (seenMessages.current.get(selectedId) !== latestId) {
@@ -116,7 +121,6 @@ export default function ThreadCenter({ token, audience, channel, userId, initial
         setCreating(true); setStatus('open'); setSelectedId(null); setDetail(null); setLoaded(false)
         setDraft(''); setError(''); setNotice(''); setRefresh((value) => value + 1)
       }}>{channel === 'questions' ? 'Yeni soru sor' : 'Yeni destek talebi'}</button>}
-      <RefreshButton busy={busy} label="Yenile" onClick={() => { setError(''); setRefresh((value) => value + 1) }} />
     </div>
     <div className="thread-center__layout">
       <ThreadList threads={threads} selectedId={selectedId} audience={audience} onSelect={(id) => {

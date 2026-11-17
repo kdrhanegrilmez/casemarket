@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import AdminActionDialog from './AdminActionDialog'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')
 
-export default function SellerAccessEditor({ sellerId, storeName, token, onUnauthorized, onRevoked }) {
+export default function SellerAccessEditor({ sellerId, storeName, token, onUnauthorized, onRevoked, compact = false }) {
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
@@ -25,12 +26,16 @@ export default function SellerAccessEditor({ sellerId, storeName, token, onUnaut
     } catch (revokeError) { setError(revokeError.message) }
     finally { setBusy(false) }
   }
-  if (!open) return <button type="button" className="admin-dashboard__remove-button" onClick={() => setOpen(true)}>Satıcı yetkisini geri al</button>
-  return <form className="admin-dashboard__remove-form" onSubmit={revoke}>
+  return <>
+    <button type="button" className="admin-dashboard__remove-button" onClick={() => { setError(''); setOpen(true) }}>{compact ? 'Yetkiyi geri al' : 'Satıcı yetkisini geri al'}</button>
+    {open && <AdminActionDialog title={`${storeName} · Satıcı yetkisini geri al`} busy={busy} onClose={() => setOpen(false)}>
+    <form className="admin-dashboard__remove-form" onSubmit={revoke}>
     <p>{storeName} mağazası yeniden incelemeye alınacak. Satıcı paneli erişimi kapanacak ve ürünleri vitrinden kalkacak.</p>
     <label>Yetki geri alma gerekçesi<textarea value={reason} onChange={(event) => setReason(event.target.value)} minLength="5" maxLength="500" rows="3" required disabled={busy} /></label>
     <div><button type="submit" disabled={busy || reason.trim().length < 5}>{busy ? 'İşleniyor…' : 'Yetkiyi geri al'}</button>
       <button type="button" disabled={busy} onClick={() => setOpen(false)}>Vazgeç</button></div>
     {error && <small role="alert">{error}</small>}
   </form>
+    </AdminActionDialog>}
+  </>
 }

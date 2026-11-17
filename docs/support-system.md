@@ -59,7 +59,7 @@ Eski `seller_notifications` tablosu ve bildirim API'leri korunur; arayüz bunlar
   Admin adı müşteri ve satıcıya `Admin` olarak gösterilir.
 
 Açık liste 15, açık sohbet 8 saniyede yenilenir; her istek bittikten sonra beklenir.
-Sonlandırılan listesi ve sohbet yalnızca seçildiğinde/yenilendiğinde okunur; periyodik
+Sonlandırılan listesi ve sohbet filtre veya sekme görünürlüğü değiştiğinde okunur; periyodik
 detay isteği gönderilmez. Arka planda timer ve istekler iptal edilir, sekme görünür
 olunca bir kez yenilenir. Rozetler 15 saniyede bir kontrol edilir. Sohbet okuması
 sonrası sayaç yalnızca görülen son mesaj değiştiyse ayrıca yenilenir.
@@ -104,6 +104,17 @@ görüşmeyi, ürün sorusu sonlandırmayı, aktif polling sıklığını, bitmi
 polling yapılmamasını, gizli sekmeyi ve mobil panel genişliğini doğrular.
 Test HTML'i `frontend/tests/` altındadır ve üretim derlemesinin girdisi değildir.
 Ekran görüntüleri `/tmp/casemarket-support-check/` altına yazılır.
+
+Mağaza tablosunun ekran genişliklerine sığması, gerekçe pencereleri ve satıcı
+sekme boyutları için aynı ortamda:
+
+```bash
+NODE_PATH=/tmp/casemarket-support-check/node_modules node tests/admin-store-layout-check.cjs
+```
+
+Sohbet araç çubuğunda ayrı bir Yenile düğmesi yoktur; açık görüşmeler otomatik
+güncellenir. Satıcıda pano sekmeleri, iletişim kanalları ve sohbet işlemleri
+sırasıyla 46, 38 ve 30 piksel minimum yüksekliktedir.
 
 ## Elle test: müşteri → admin → satıcı
 

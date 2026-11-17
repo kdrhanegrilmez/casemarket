@@ -1,8 +1,10 @@
 # Mağazayı geçici kapatma
 
-Admin → Mağazalar → Mağaza yayını sütununda **Mağazayı geçici kapat**
+Admin → Mağazalar → İşlemler sütununda **Geçici kapat**
 düğmesini kullanın. 5–500 karakter gerekçe girip onaylayın. Durum **Geçici kapalı**
-olarak görünür. Aynı yerden gerekçeyle **Mağazayı yeniden aç** işlemi yapılır.
+olarak görünür. Aynı yerden gerekçeyle **Yeniden aç** işlemi yapılır.
+Gerekçe formu ayrı bir pencerede açılır; tablo satırını genişletmez. Küçük
+ekranlarda mağaza kayıtları kart düzeninde gösterilir.
 
 Satıcı rolü ve mağaza onayı korunur. Kapalı mağazanın ürünleri katalogda ve ürün
 detayında görünmez; yeni sipariş ve yeni ürün sorusu oluşturulamaz. Satıcı mevcut

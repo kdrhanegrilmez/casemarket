@@ -106,6 +106,11 @@
 .seller-communication__tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .seller-communication__tabs button { padding: 10px 14px; border: 1px solid #d8d0c6; border-radius: 7px; background: #fffefa; color: #535a51; font-size: 12px; cursor: pointer; }
 .seller-communication__tabs button.active { border-color: #27362e; background: #27362e; color: #fff; }
+.seller-dashboard__tabs { gap: 10px; margin-bottom: 20px; }
+.seller-dashboard__tabs button { min-height: 46px; min-width: 116px; padding: 12px 24px; border-radius: 10px; font-size: 15px; font-weight: 650; }
+.seller-communication__channels { margin-bottom: 16px; }
+.seller-communication__channels button { min-height: 38px; padding: 9px 16px; font-size: 13px; font-weight: 500; }
+.seller-dashboard .thread-center__toolbar button { min-height: 30px; padding: 6px 10px; border-radius: 6px; font-size: 11px; line-height: 1.3; font-weight: 600; }
 .seller-communication__tabs .seller-communication__refresh { margin-left: auto; }
 .seller-notifications__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 26px; border-bottom: 1px solid #e9e3da; }
 .seller-notifications__heading span { color: #9c8e7c; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }

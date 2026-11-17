@@ -186,14 +186,16 @@ const sections = {
   stores: {
     title: 'Mağazalar',
     path: 'stores',
-    columns: ['ID', 'Mağaza', 'Sahibi', 'Durum', 'Ürün', 'Komisyon oranı', 'Satıcı yetkisi', 'Mağaza yayını'],
+    columns: ['ID', 'Mağaza', 'Sahibi', 'Durum', 'Ürün', 'Komisyon', 'İşlemler'],
     cells: (store, context) => [
-      store.id, store.store_name, `${store.owner_name} · ${store.owner_email}`,
+      store.id, store.store_name, <span className="admin-stores__owner"><strong>{store.owner_name}</strong><small>{store.owner_email}</small></span>,
       store.is_temporarily_closed ? `${storeLabel[store.approval_status]} · Geçici kapalı` : storeLabel[store.approval_status], store.product_count,
       <CommissionEditor store={store} {...context} />,
-      store.approval_status === 'approved' ? <SellerAccessEditor sellerId={store.id} storeName={store.store_name}
-        token={context.token} onUnauthorized={context.onUnauthorized} onRevoked={context.onRevoked} /> : 'Yetki kapalı',
-      <StoreClosureEditor store={store} {...context} />,
+      store.approval_status === 'approved' ? <div className="admin-stores__actions">
+        <StoreClosureEditor store={store} {...context} />
+        <SellerAccessEditor compact sellerId={store.id} storeName={store.store_name}
+          token={context.token} onUnauthorized={context.onUnauthorized} onRevoked={context.onRevoked} />
+      </div> : <span className="admin-dashboard__muted">Yetki kapalı</span>,
     ],
   },
   phones: {
@@ -272,7 +274,7 @@ function AdminTable({ section, rows, context }) {
   if (rows.length === 0) return <p>Bu bölümde kayıt yok.</p>
 
   return (
-    <div className="admin-dashboard__table">
+    <div className={`admin-dashboard__table${section.path === 'stores' ? ' admin-stores' : ''}`}>
       <table aria-label={section.title}>
         <thead>
           <tr>
@@ -283,7 +285,7 @@ function AdminTable({ section, rows, context }) {
           {rows.map((row) => (
             <tr key={row.id}>
               {section.cells(row, context).map((cell, index) => (
-                <td key={section.columns[index]}>{cell}</td>
+                <td key={section.columns[index]} data-label={section.columns[index]}>{cell}</td>
               ))}
             </tr>
           ))}

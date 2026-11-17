@@ -404,13 +404,13 @@ function SellerDashboard({ token, user, onBack, onUnauthorized }) {
 
           {/*yeni ürün ekleme formu*/}
 
-          <div className="seller-communication__tabs" role="tablist" aria-label="Pano bölümleri">
+          <div className="seller-communication__tabs seller-dashboard__tabs" role="tablist" aria-label="Pano bölümleri">
             {[['products', 'Ürünler'], ['orders', 'Siparişler'], ['messages', 'Mesajlar']].map(([value, label]) => <button
               key={value} type="button" role="tab" aria-selected={dashboardTab === value} className={dashboardTab === value ? 'active' : ''}
               onClick={() => setDashboardTab(value)}>{label} {value === 'messages' && <UnreadBadge count={unread} />}</button>)}
           </div>
           {dashboardTab === 'messages' && <section className="seller-communication" aria-label="Satıcı iletişim merkezi">
-            <div className="seller-communication__tabs" role="tablist" aria-label="İletişim bölümleri">
+            <div className="seller-communication__tabs seller-communication__channels" role="tablist" aria-label="İletişim bölümleri">
               <button type="button" role="tab" aria-selected={communicationTab === 'questions'} className={communicationTab === 'questions' ? 'active' : ''}
                 onClick={() => setCommunicationTab('questions')}>Müşteri soruları</button>
               <button type="button" role="tab" aria-selected={communicationTab === 'support'} className={communicationTab === 'support' ? 'active' : ''}

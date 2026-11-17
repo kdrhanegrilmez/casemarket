@@ -4,6 +4,10 @@ import React, { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import ThreadCenter from '../src/components/ThreadCenter.jsx'
 import CustomerSupportWidget from '../src/components/CustomerSupportWidget.jsx'
+import AdminDashboard from '../src/components/AdminDashboard.jsx'
+import SellerDashboard from '../src/components/SellerDashboard.jsx'
+import '../src/index.css'
+import '../src/App.css'
 import '../src/components/CustomerSupportWidget.css'
 const args = new URLSearchParams(location.search)
 const role = args.get('role') || 'customer'
@@ -11,6 +15,8 @@ const channel = args.get('channel') || 'support'
 function Check() {
   const [open, setOpen] = useState(true)
   const [selectedChannel, setChannel] = useState(channel)
+  if (role === 'admin-stores') return React.createElement(AdminDashboard, { token: 'test', userId: 2 })
+  if (role === 'seller-panel') return React.createElement(SellerDashboard, { token: 'test', user: { id: 9, role: 'seller', full_name: 'Test Satıcı' } })
   if (role === 'customer') return React.createElement(CustomerSupportWidget, {
     token: 'test', user: { id: 7, role }, open, channel: selectedChannel,
     productId: channel === 'questions' ? 50 : null, onOpenChange: setOpen, onChannelChange: setChannel,

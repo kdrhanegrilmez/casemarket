@@ -68,6 +68,17 @@ async function scenario(browser, role, channel = 'support') {
     }
     const activePolls = requests.filter(x => x === 'GET /threads/2').length - before
     assert.ok(activePolls >= 1 && activePolls <= 4, `Unexpected active polling burst: ${activePolls}`)
+    if (role === 'customer' && channel === 'support') {
+      threads[1].status = 'closed'
+      await page.clock.runFor(8500)
+      await page.waitForTimeout(100)
+      if (await page.getByText('Bu görüşme sonlandırıldı.', { exact: false }).count()) {
+        assert.equal(await page.getByRole('button', { name: 'Sonlandırılan', exact: true }).getAttribute('aria-pressed'), 'true')
+      } else await composer.waitFor()
+      await page.getByRole('button', { name: 'Devam eden', exact: true }).click()
+      await composer.waitFor()
+      assert.equal(await page.getByText('Bu görüşme sonlandırıldı.', { exact: false }).count(), 0)
+    }
   }
 
   // Geçmişteki bitmiş görüşmeyi seçince detay ve liste için periyodik istek yapılmamalı.
