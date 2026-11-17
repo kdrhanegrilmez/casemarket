@@ -38,3 +38,4 @@
 .account-page .order-history__heading > button { display: none; }
 @media (max-width: 850px) { .account-page__layout { grid-template-columns: 1fr; } .account-page__nav { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .account-page { width: calc(100% - 28px); padding-top: 22px; } .account-page__hero { flex-direction: column; align-items: start; padding: 26px; } .account-page__nav { grid-template-columns: 1fr 1fr; padding: 7px; } .account-page__nav button { font-size: 11px; padding: 11px; } .account-form--grid { grid-template-columns: 1fr; } .account-list__item { align-items: start; flex-direction: column; } }
+.seller-application__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e6e3dd; }

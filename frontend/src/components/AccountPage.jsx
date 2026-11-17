@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { accountRequest } from '../api/account'
 import OrderHistory from './OrderHistory'
+import SellerApplication from './SellerApplication'
 import './AccountPage.css'
 
 const tabs = [
@@ -64,10 +65,10 @@ export default function AccountPage({ token, user, onUserChange, onBack, onSelle
   }
 
   const visibleTabs = user.role === 'seller'
-    ? [...tabs, ['seller', 'Satıcı paneli']]
+    ? [...tabs, ['seller', 'Mağazam']]
     : user.role === 'admin'
       ? [...tabs, ['admin', 'Admin paneli']]
-      : tabs
+      : [...tabs, ['seller', 'Mağaza başvurusu']]
 
   return (
     <section className="account-page">
@@ -140,11 +141,7 @@ export default function AccountPage({ token, user, onUserChange, onBack, onSelle
             </form>
           </div>}
           {(tab === 'active' || tab === 'history') && <OrderHistory token={token} filter={tab} onBack={onBack} />}
-          {tab === 'seller' && user.role === 'seller' && <div className="account-panel">
-            <span className="overline">MAĞAZAM</span><h2>Satıcı paneli</h2>
-            <p>Ürünlerini ekle, stoklarını güncelle ve yayındaki ürünlerini yönet.</p>
-            <button type="button" className="button button--dark" onClick={onSellerOpen}>Satıcı paneline gir ↗</button>
-          </div>}
+          {tab === 'seller' && user.role !== 'admin' && <SellerApplication token={token} user={user} onUserChange={onUserChange} onSellerOpen={onSellerOpen} />}
           {tab === 'admin' && user.role === 'admin' && <div className="account-panel">
             <span className="overline">YÖNETİM</span><h2>Admin paneli</h2>
             <p>Siparişleri, ürünleri, mağazaları ve kullanıcıları incele.</p>

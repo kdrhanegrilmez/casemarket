@@ -4,6 +4,8 @@ import './AdminDashboard.css'
 import ThreadCenter from './ThreadCenter'
 import useSupportUnread from './useSupportUnread'
 import UnreadBadge from './UnreadBadge'
+import AdminApplications from './AdminApplications'
+import SellerAccessEditor from './SellerAccessEditor'
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
@@ -19,6 +21,7 @@ const shortDate = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'sho
 
 const iconPaths = {
   support: <path d="M21 11a8 8 0 0 1-8 8H7l-5 3V11a9 9 0 0 1 19 0ZM7 10h10M7 14h6" />,
+  applications: <><path d="M4 4h16v16H4zM8 9h8M8 14h8" /></>,
   overview: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
   sales: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></>,
   stores: <><path d="M3 10h18l-2-6H5l-2 6Z" /><path d="M5 10v10h14V10M9 20v-6h6v6" /></>,
@@ -182,11 +185,13 @@ const sections = {
   stores: {
     title: 'Mağazalar',
     path: 'stores',
-    columns: ['ID', 'Mağaza', 'Sahibi', 'Durum', 'Ürün', 'Komisyon oranı'],
+    columns: ['ID', 'Mağaza', 'Sahibi', 'Durum', 'Ürün', 'Komisyon oranı', 'Satıcı yetkisi'],
     cells: (store, context) => [
       store.id, store.store_name, `${store.owner_name} · ${store.owner_email}`,
       storeLabel[store.approval_status], store.product_count,
       <CommissionEditor store={store} {...context} />,
+      store.approval_status === 'approved' ? <SellerAccessEditor sellerId={store.id} storeName={store.store_name}
+        token={context.token} onUnauthorized={context.onUnauthorized} onRevoked={context.onRevoked} /> : 'Yetki kapalı',
     ],
   },
   phones: {
@@ -197,6 +202,7 @@ const sections = {
   },
   users: { title: 'Müşteriler', ...users, role: 'customer' },
   support: { title: 'Destek' },
+  applications: { title: 'Başvurular' },
 }
 
 function Overview({ data }) {
@@ -359,10 +365,15 @@ function AdminSection({ section, token, onUnauthorized, onOpenThread }) {
       },
     }))
   }
+  const onRevoked = (sellerId) => {
+    setResult((previous) => ({ ...previous, data: { ...previous.data,
+      items: previous.data.items.map((store) => store.id === sellerId ? { ...store, approval_status: 'pending' } : store),
+    } }))
+  }
 
   return (
     <>
-      <AdminTable section={section} rows={current.data.items} context={{ token, onUnauthorized, onSaved, onRemoved, onOpenThread }} />
+      <AdminTable section={section} rows={current.data.items} context={{ token, onUnauthorized, onSaved, onRemoved, onRevoked, onOpenThread }} />
       {(offset > 0 || current.data.has_more) && (
         <div className="admin-dashboard__pagination">
           <button type="button" disabled={offset === 0} onClick={() => setOffset(offset - PAGE_SIZE)}>Önceki</button>
@@ -382,7 +393,7 @@ export default function AdminDashboard({ token, userId, onBack, onLogout, onUnau
   const section = sections[tab]
   const navigation = [
     { label: 'GENEL', items: ['overview'] },
-    { label: 'PAZARYERİ', items: ['sales', 'products', 'stores', 'sellers', 'phones'] },
+    { label: 'PAZARYERİ', items: ['sales', 'products', 'stores', 'applications', 'sellers', 'phones'] },
     { label: 'YÖNETİM', items: ['users', 'support'] },
   ]
 
@@ -420,7 +431,7 @@ export default function AdminDashboard({ token, userId, onBack, onLogout, onUnau
               {tab === 'overview' && <span className="admin-dashboard__date">{new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date())}</span>}
             </div>
             {tab === 'stores' && <p className="admin-dashboard__commission-note">Oran mağazaya kaydedilir. Sipariş komisyonu ve satıcı ödemeleri henüz otomatik hesaplanmaz.</p>}
-            {tab === 'support' ? <>
+            {tab === 'applications' ? <AdminApplications token={token} onUnauthorized={onUnauthorized} /> : tab === 'support' ? <>
               <div className="admin-dashboard__support-tabs" role="tablist" aria-label="Destek kanalları">
                 <button type="button" role="tab" aria-selected={supportChannel === 'customer'} className={supportChannel === 'customer' ? 'active' : ''}
                   onClick={() => { setSupportChannel('customer'); setSupportThreadId(null) }}>Müşteri desteği</button>
