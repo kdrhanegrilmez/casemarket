@@ -283,14 +283,14 @@ function SellerDashboard({ token, user, onBack, onUnauthorized }) {
 
   }
 
-  async function updateShipping(orderId, itemId, status) {
+  async function updateShipping(orderId, itemId, status, tracking = {}) {
     setShippingBusyId(itemId)
     setShippingError('')
     try {
       const response = await fetch(`${API_BASE_URL}/api/sellers/me/orders/${orderId}/items/${itemId}/shipping`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...tracking }),
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) throw new Error(typeof data?.detail === 'string' ? data.detail : 'Kargo durumu güncellenemedi.')
@@ -680,12 +680,22 @@ function SellerDashboard({ token, user, onBack, onUnauthorized }) {
                   {order.items.map((item) => {
                     const next = nextShippingStatus[item.shipping_status]
                     return <div className="seller-orders__item" key={item.id}>
-                      <div><strong>{item.product_name}</strong><small>{item.quantity} adet · {formatPrice(item.unit_price)} · {shippingLabels[item.shipping_status] || item.shipping_status}</small></div>
-                      {order.status === 'paid' && next && <button
+                      <div><strong>{item.product_name}</strong><small>{item.quantity} adet · {formatPrice(item.unit_price)} · {shippingLabels[item.shipping_status] || item.shipping_status}</small>
+                        {item.shipping_company && <small>{item.shipping_company} · Takip: {item.tracking_number}</small>}</div>
+                      {order.status === 'paid' && next === 'shipped' && <form className="seller-orders__tracking" onSubmit={(event) => {
+                        event.preventDefault()
+                        const values = Object.fromEntries(new FormData(event.currentTarget).entries())
+                        updateShipping(order.id, item.id, next, values)
+                      }}>
+                        <label>Kargo firması<input name="shipping_company" maxLength="100" required /></label>
+                        <label>Takip numarası<input name="tracking_number" maxLength="100" required /></label>
+                        <button type="submit" disabled={shippingBusyId !== null || !order.shipping_address}>Kargoya ver</button>
+                      </form>}
+                      {order.status === 'paid' && next && next !== 'shipped' && <button
                         type="button"
                         disabled={shippingBusyId !== null || (next === 'shipped' && !order.shipping_address)}
                         onClick={() => updateShipping(order.id, item.id, next)}
-                      >{shippingBusyId === item.id ? 'Kaydediliyor...' : next === 'preparing' ? 'Hazırlamaya başla' : next === 'shipped' ? 'Kargoya ver' : 'Teslim edildi'}</button>}
+                      >{shippingBusyId === item.id ? 'Kaydediliyor...' : next === 'preparing' ? 'Hazırlamaya başla' : 'Teslim edildi'}</button>}
                     </div>
                   })}
                 </div>

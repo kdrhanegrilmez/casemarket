@@ -493,6 +493,9 @@
 .seller-orders__item { padding: 15px 0; border-bottom: 1px solid #e6e3dd; font-size: 13px; }
 .seller-orders__item button { padding: 9px 12px; border: 1px solid #202521; background: #202521; color: #fffefa; font-size: 11px; cursor: pointer; }
 .seller-orders__item button:disabled { opacity: .5; cursor: not-allowed; }
+.seller-orders__tracking { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.seller-orders__tracking label { display: grid; gap: 4px; font-size: 11px; }
+.seller-orders__tracking input { padding: 8px; border: 1px solid #d9d6cd; background: #fffefa; color: #202521; }
 .seller-orders__total { padding-top: 17px; font-size: 12px; }
 .seller-orders__total strong { font-size: 18px; }
 .seller-orders__error { margin: 0 30px 18px; color: #a04436; font-size: 12px; }

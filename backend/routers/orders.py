@@ -211,7 +211,9 @@ def get_my_orders(
                     oi.product_name,
                     oi.quantity,
                     oi.unit_price,
-                    oi.shipping_status
+                    oi.shipping_status,
+                    oi.shipping_company,
+                    oi.tracking_number
                 FROM orders AS o
                 LEFT JOIN order_items AS oi
                     ON oi.order_id = o.id
@@ -254,6 +256,8 @@ def get_my_orders(
                     "quantity": row[8],
                     "unit_price": str(row[9]),
                     "shipping_status": row[10],
+                    "shipping_company": row[11],
+                    "tracking_number": row[12],
                 }
             )
 

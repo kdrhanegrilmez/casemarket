@@ -49,7 +49,7 @@ function OrderHistory({ token, onBack, filter = 'history' }) {
   // SITE ICI ONAY VE SONUC PENCERESI
   const [dialog, setDialog] = useState(null)
   const visibleOrders = filter === 'active'
-    ? orders.filter((order) => order.status !== 'canceled')
+    ? orders.filter((order) => order.status !== 'canceled' && !(order.status === 'paid' && order.items.length > 0 && order.items.every((item) => item.shipping_status === 'delivered')))
     : orders
 
   // Sayfa acilinca backend'den siparisleri getir.
@@ -255,6 +255,8 @@ function OrderHistory({ token, onBack, filter = 'history' }) {
                       {order.status === 'paid' && item.shipping_status && (
                         <p>Kargo: {getShippingStatusText(item.shipping_status)}</p>
                       )}
+                      {item.shipping_company && <p>Kargo firması: {item.shipping_company}</p>}
+                      {item.tracking_number && <p>Takip numarası: {item.tracking_number}</p>}
                     </div>
 
                     <strong>

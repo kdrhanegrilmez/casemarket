@@ -91,8 +91,8 @@ class SellerShippingTests(unittest.TestCase):
     def test_seller_order_list_groups_only_queried_items(self):
         created_at = datetime(2026, 11, 5, tzinfo=timezone.utc)
         cursor = Cursor(many=[[
-            (4, "paid", created_at, "Ankara", 10, 12, "Kılıf A", 2, Decimal("50.00"), "pending"),
-            (4, "paid", created_at, "Ankara", 11, 13, "Kılıf B", 1, Decimal("75.00"), "preparing"),
+            (4, "paid", created_at, "Ankara", 10, 12, "Kılıf A", 2, Decimal("50.00"), "pending", None, None),
+            (4, "paid", created_at, "Ankara", 11, 13, "Kılıf B", 1, Decimal("75.00"), "preparing", None, None),
         ]])
         with patch("routers.seller_orders.get_connection", return_value=Connection(cursor)):
             orders = get_seller_orders(SELLER)
@@ -124,5 +124,19 @@ class SellerShippingTests(unittest.TestCase):
         connection = Connection(cursor)
         with patch("routers.seller_orders.get_connection", return_value=connection):
             with self.assertRaises(HTTPException) as error:
-                update_shipping_status(4, 10, ShippingStatusUpdate(status="shipped"), SELLER)
+                update_shipping_status(4, 10, ShippingStatusUpdate(status="shipped", shipping_company="PTT", tracking_number="12345"), SELLER)
         self.assertEqual(error.exception.status_code, 409)
+
+    def test_shipping_requires_tracking_details(self):
+        from pydantic import ValidationError
+        with self.assertRaises(ValidationError):
+            ShippingStatusUpdate(status="shipped")
+
+    def test_shipping_saves_tracking_details(self):
+        cursor = Cursor(one=[("preparing", "paid", "Ankara")])
+        with patch("routers.seller_orders.get_connection", return_value=Connection(cursor)):
+            result = update_shipping_status(4, 10, ShippingStatusUpdate(
+                status="shipped", shipping_company=" PTT ", tracking_number=" 12345 "), SELLER)
+        self.assertEqual(result["shipping_status"], "shipped")
+        update = next(params for sql, params in cursor.queries if sql.startswith("UPDATE ORDER_ITEMS"))
+        self.assertEqual(update, ("shipped", "PTT", "12345", 10))

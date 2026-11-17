@@ -225,7 +225,9 @@ CREATE TABLE IF NOT EXISTS order_items (
         CHECK (unit_price > 0),
 
     shipping_status VARCHAR(20) NOT NULL DEFAULT 'pending'
-        CHECK (shipping_status IN ('pending', 'preparing', 'shipped', 'delivered'))
+        CHECK (shipping_status IN ('pending', 'preparing', 'shipped', 'delivered')),
+    shipping_company VARCHAR(100),
+    tracking_number VARCHAR(100)
 );
 
 CREATE INDEX IF NOT EXISTS idx_order_items_seller_order ON order_items(seller_id, order_id);

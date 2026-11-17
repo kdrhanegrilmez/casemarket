@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from core.dependencies import get_current_user
 from database import get_connection
@@ -15,6 +15,14 @@ NEXT_STATUS = {"pending": "preparing", "preparing": "shipped", "shipped": "deliv
 class ShippingStatusUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     status: Literal["preparing", "shipped", "delivered"]
+    shipping_company: str | None = Field(default=None, max_length=100)
+    tracking_number: str | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def require_tracking_when_shipped(self):
+        if self.status == "shipped" and not (self.shipping_company and self.shipping_company.strip() and self.tracking_number and self.tracking_number.strip()):
+            raise ValueError("Kargo firması ve takip numarası zorunludur.")
+        return self
 
 
 def _require_seller(user):
@@ -31,7 +39,7 @@ def get_seller_orders(current_user: dict = Depends(get_current_user)):
                 """
                 SELECT o.id, o.status, o.created_at, o.shipping_address,
                        oi.id, oi.product_id, oi.product_name, oi.quantity,
-                       oi.unit_price, oi.shipping_status
+                       oi.unit_price, oi.shipping_status, oi.shipping_company, oi.tracking_number
                 FROM order_items AS oi
                 JOIN orders AS o ON o.id = oi.order_id
                 JOIN sellers AS s ON s.id = oi.seller_id
@@ -60,6 +68,8 @@ def get_seller_orders(current_user: dict = Depends(get_current_user)):
             "quantity": row[7],
             "unit_price": str(row[8]),
             "shipping_status": row[9],
+            "shipping_company": row[10],
+            "tracking_number": row[11],
         })
 
     for order in orders_by_id.values():
@@ -100,8 +110,14 @@ def update_shipping_status(
                 if data.status == "shipped" and not address:
                     raise HTTPException(status_code=409, detail="Teslimat adresi olmayan sipariş kargoya verilemez.")
                 cursor.execute(
-                    "UPDATE order_items SET shipping_status = %s WHERE id = %s",
-                    (data.status, item_id),
+                    """UPDATE order_items
+                       SET shipping_status = %s,
+                           shipping_company = COALESCE(%s, shipping_company),
+                           tracking_number = COALESCE(%s, tracking_number)
+                       WHERE id = %s""",
+                    (data.status, data.shipping_company.strip() if data.shipping_company else None,
+                     data.tracking_number.strip() if data.tracking_number else None, item_id),
                 )
 
-    return {"order_id": order_id, "item_id": item_id, "shipping_status": data.status}
+    return {"order_id": order_id, "item_id": item_id, "shipping_status": data.status,
+            "shipping_company": data.shipping_company, "tracking_number": data.tracking_number}
