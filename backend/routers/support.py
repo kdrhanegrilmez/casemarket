@@ -3,6 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from psycopg.rows import dict_row
+from psycopg.errors import UniqueViolation
 
 from core.dependencies import get_current_user, require_admin
 from database import get_connection
@@ -49,17 +50,19 @@ def _check_message_limit(cursor, user_id):
 def _create_or_reply(kind, user, message, *, customer_id=None, seller_id=None, product_id=None):
     with get_connection() as connection:
         with connection.cursor(row_factory=dict_row) as cursor:
-            cursor.execute(
-                """
-                INSERT INTO support_threads (kind, customer_user_id, seller_user_id, product_id)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT DO NOTHING
-                RETURNING id
-                """,
-                (kind, customer_id, seller_id, product_id),
-            )
-            created = cursor.fetchone()
-            if created is None:
+            for _ in range(3):
+                cursor.execute(
+                    """
+                    INSERT INTO support_threads (kind, customer_user_id, seller_user_id, product_id)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING RETURNING id
+                    """,
+                    (kind, customer_id, seller_id, product_id),
+                )
+                created = cursor.fetchone()
+                if created is not None:
+                    thread_id = created["id"]
+                    break
                 cursor.execute(
                     """
                     SELECT id, status FROM support_threads
@@ -67,18 +70,17 @@ def _create_or_reply(kind, user, message, *, customer_id=None, seller_id=None, p
                       AND customer_user_id IS NOT DISTINCT FROM %s
                       AND seller_user_id IS NOT DISTINCT FROM %s
                       AND product_id IS NOT DISTINCT FROM %s
+                      AND status = 'open'
                     FOR UPDATE
                     """,
                     (kind, customer_id, seller_id, product_id),
                 )
                 existing = cursor.fetchone()
-                if existing is None:
-                    raise HTTPException(status_code=409, detail="Konuşma oluşturulamadı.")
-                if existing["status"] == "closed":
-                    raise HTTPException(status_code=409, detail="Bu destek sonlandırıldı. Bu görüşmeye yeni mesaj gönderilemez.")
-                thread_id = existing["id"]
+                if existing is not None and existing["status"] == "open":
+                    thread_id = existing["id"]
+                    break
             else:
-                thread_id = created["id"]
+                raise HTTPException(status_code=409, detail="Görüşme durumu değişti. Lütfen yeniden deneyin.")
 
             _check_message_limit(cursor, user["id"])
             cursor.execute(
@@ -330,17 +332,21 @@ def admin_unread_count(admin: dict = Depends(require_admin)):
 def update_thread_status(
     thread_id: int,
     data: ThreadStatusUpdate,
-    admin: dict = Depends(require_admin),
+    admin: dict = Depends(get_current_user),
 ):
-    _require_role(admin, "admin")
     with get_connection() as connection:
         with connection.cursor(row_factory=dict_row) as cursor:
-            _get_thread(cursor, thread_id, admin, lock=True)
-            cursor.execute(
-                """UPDATE support_threads
-                   SET status = %s, closed_at = CASE WHEN %s = 'closed' THEN NOW() ELSE NULL END
-                   WHERE id = %s RETURNING status, closed_at""",
-                (data.status, data.status, thread_id),
-            )
-            result = cursor.fetchone()
+            thread = _get_thread(cursor, thread_id, admin, lock=True)
+            if admin["role"] != "admin" and not (thread["kind"] == "product_question" and data.status == "closed"):
+                raise HTTPException(status_code=403, detail="Yalnızca kendi ürün sorusu görüşmenizi sonlandırabilirsiniz.")
+            try:
+                cursor.execute(
+                    """UPDATE support_threads
+                       SET status = %s, closed_at = CASE WHEN %s = 'closed' THEN COALESCE(closed_at, NOW()) ELSE NULL END
+                       WHERE id = %s RETURNING status, closed_at""",
+                    (data.status, data.status, thread_id),
+                )
+                result = cursor.fetchone()
+            except UniqueViolation:
+                raise HTTPException(status_code=409, detail="Bu kapsamda açık bir görüşme zaten var. Yeni görüşmeden devam edin.") from None
     return {"thread_id": thread_id, **result}

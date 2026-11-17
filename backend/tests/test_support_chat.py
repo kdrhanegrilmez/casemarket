@@ -170,8 +170,10 @@ class SupportChatTests(unittest.TestCase):
         self.assertEqual(cursor.queries[-1][1], ("closed", "closed", 14))
 
     def test_customer_cannot_close_thread(self):
-        with self.assertRaises(HTTPException) as error:
-            update_thread_status(14, ThreadStatusUpdate(status="closed"), {"id": 7, "role": "customer"})
+        cursor = FakeCursor(rows=[{"id": 14, "kind": "customer_support", "customer_user_id": 7, "seller_user_id": None}])
+        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+            with self.assertRaises(HTTPException) as error:
+                update_thread_status(14, ThreadStatusUpdate(status="closed"), {"id": 7, "role": "customer"})
         self.assertEqual(error.exception.status_code, 403)
 
     def test_admin_can_reopen_thread_and_clear_closed_at(self):
@@ -185,8 +187,10 @@ class SupportChatTests(unittest.TestCase):
     def test_status_validation_and_seller_status_permission(self):
         with self.assertRaises(ValidationError):
             ThreadStatusUpdate(status="archived")
-        with self.assertRaises(HTTPException) as error:
-            update_thread_status(14, ThreadStatusUpdate(status="closed"), {"id": 9, "role": "seller"})
+        cursor = FakeCursor(rows=[{"id": 14, "kind": "seller_support", "customer_user_id": None, "seller_user_id": 9}])
+        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+            with self.assertRaises(HTTPException) as error:
+                update_thread_status(14, ThreadStatusUpdate(status="closed"), {"id": 9, "role": "seller"})
         self.assertEqual(error.exception.status_code, 403)
 
     def test_missing_thread_and_foreign_seller_cannot_read_or_send(self):
@@ -325,17 +329,38 @@ class SupportChatTests(unittest.TestCase):
                 self.assertFalse(connection.committed)
                 self.assertEqual(len(cursor.queries), 1)
 
-    def test_contact_endpoints_cannot_reopen_completed_support(self):
+    def test_contact_endpoints_create_new_session_after_completion(self):
         for operation, user in ((contact_customer_support, {"id": 7, "role": "customer"}),
                                 (contact_seller_support, {"id": 9, "role": "seller"})):
-            cursor = FakeCursor(rows=[None, {"id": 14, "status": "closed"}])
+            cursor = FakeCursor(rows=[{"id": 15}, {"message_count": 0}, {"id": 53, "created_at": datetime.now(timezone.utc)}])
             connection = FakeConnection(cursor)
             with patch("routers.support.get_connection", return_value=connection):
-                with self.assertRaises(HTTPException) as error:
-                    operation(MessageCreate(message="Tekrar yardım"), user)
-            self.assertEqual(error.exception.status_code, 409)
-            self.assertFalse(connection.committed)
-            self.assertFalse(any("INSERT INTO SUPPORT_MESSAGES" in sql for sql, _ in cursor.queries))
+                result = operation(MessageCreate(message="Tekrar yardım"), user)
+            self.assertEqual(result["thread_id"], 15)
+            self.assertTrue(connection.committed)
+            self.assertEqual(cursor.queries[-2][1], (15, user["id"], "Tekrar yardım"))
+
+    def test_create_retries_if_existing_session_finishes_during_request(self):
+        cursor = FakeCursor(rows=[None, None, {"id": 15}, {"message_count": 0},
+                                  {"id": 53, "created_at": datetime.now(timezone.utc)}])
+        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+            result = contact_customer_support(MessageCreate(message="Yeni talep"), {"id": 7, "role": "customer"})
+        self.assertEqual(result["thread_id"], 15)
+        self.assertIn("AND STATUS = 'OPEN'", cursor.queries[1][0])
+
+    def test_product_question_participants_can_finish_but_not_reopen(self):
+        for role, user_id in (("customer", 7), ("seller", 9)):
+            for decision in ("closed", "open"):
+                cursor = FakeCursor(rows=[{"id": 14, "kind": "product_question", "customer_user_id": 7, "seller_user_id": 9},
+                                          {"status": "closed", "closed_at": datetime.now(timezone.utc)}])
+                with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+                    if decision == "closed":
+                        result = update_thread_status(14, ThreadStatusUpdate(status=decision), {"id": user_id, "role": role})
+                        self.assertEqual(result["status"], "closed")
+                    else:
+                        with self.assertRaises(HTTPException) as error:
+                            update_thread_status(14, ThreadStatusUpdate(status=decision), {"id": user_id, "role": role})
+                        self.assertEqual(error.exception.status_code, 403)
 
     def test_missing_product_question_and_missing_status_thread_return_404(self):
         for operation in ("question", "status"):

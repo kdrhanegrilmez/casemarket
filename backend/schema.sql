@@ -131,11 +131,11 @@ CREATE TABLE IF NOT EXISTS support_threads (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_support_customer_thread
-ON support_threads(customer_user_id) WHERE kind = 'customer_support';
+ON support_threads(customer_user_id) WHERE kind = 'customer_support' AND status = 'open';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_support_seller_thread
-ON support_threads(seller_user_id) WHERE kind = 'seller_support';
+ON support_threads(seller_user_id) WHERE kind = 'seller_support' AND status = 'open';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_support_question_thread
-ON support_threads(customer_user_id, product_id) WHERE kind = 'product_question';
+ON support_threads(customer_user_id, product_id) WHERE kind = 'product_question' AND status = 'open';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_support_moderation_thread
 ON support_threads(product_id) WHERE kind = 'product_moderation';
 CREATE INDEX IF NOT EXISTS idx_support_threads_seller
