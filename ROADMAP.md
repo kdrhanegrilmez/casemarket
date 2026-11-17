@@ -1,6 +1,6 @@
 # CaseMarket — Proje Yol Haritası
 
-Son güncelleme: 30 Ekim 2026
+Son güncelleme: 17 Kasım 2026
 
 ## Teknolojiler
 
@@ -91,10 +91,19 @@ paid -> preparing -> shipped -> delivered
 
 ## 7. Mesajlaşma ve destek
 
-- [ ] Müşteri-satıcı mesajlaşması
-- [ ] Mesaj geçmişinin veritabanında tutulması
+- [x] Ürün soruları üzerinden müşteri-satıcı mesajlaşması
+- [x] Mesaj geçmişinin veritabanında tutulması
+- [x] Müşteri-admin ve satıcı-admin destek sistemi
+- [x] Ürün moderasyonunu tek konuşmada takip etme
+- [x] Kullanıcı bazında okundu takibi ve üç rolde okunmamış rozetleri
+- [x] Admin için açık/kapalı konuşma filtresi ve durum yönetimi
+- [x] Ortak sohbet bileşenleri ve tek mesaj kutusu
+- [x] Görünür sekmede polling ve kullanıcı başına dakikada 10 mesaj sınırı
+- [x] Destek API birim testleri ve yetki kontrolleri
+- [ ] Sipariş bazlı konuşma
 - [ ] WebSocket ile gerçek zamanlı mesajlaşma
-- [ ] Müşteri-admin destek sistemi
+
+Kurulum sırası ve elle test akışı: [Destek sistemi kontrol rehberi](docs/support-system.md).
 
 ## 8. Güvenlik, test ve yayınlama
 

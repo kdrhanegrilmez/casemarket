@@ -7,7 +7,8 @@ from pydantic import ValidationError
 
 from main import app
 from routers.support import (
-    MessageCreate, ThreadStatusUpdate, admin_unread_count, contact_customer_support,
+    MessageCreate, ThreadStatusUpdate, admin_unread_count, ask_product_question,
+    contact_customer_support, contact_seller_support,
     get_thread, list_admin_threads, list_my_threads, my_unread_count,
     send_message, update_thread_status,
 )
@@ -128,6 +129,7 @@ class SupportChatTests(unittest.TestCase):
         self.assertEqual(customer_cursor.queries[0][1], (7, 7, 7))
         self.assertIn("T.CUSTOMER_USER_ID = %S", customer_cursor.queries[0][0])
         self.assertEqual(admin_cursor.queries[0][1], (2, 2))
+        self.assertIn("T.KIND IN ('CUSTOMER_SUPPORT', 'SELLER_SUPPORT', 'PRODUCT_MODERATION')", admin_cursor.queries[0][0])
 
     def test_my_list_filters_status_and_strips_email(self):
         cursor = FakeCursor(many=[[{"id": 14, "status": "closed", "unread_count": 2,
@@ -170,6 +172,157 @@ class SupportChatTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as error:
             update_thread_status(14, ThreadStatusUpdate(status="closed"), {"id": 7, "role": "customer"})
         self.assertEqual(error.exception.status_code, 403)
+
+    def test_admin_can_reopen_thread_and_clear_closed_at(self):
+        cursor = FakeCursor(rows=[{"id": 14}, {"status": "open", "closed_at": None}])
+        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+            result = update_thread_status(14, ThreadStatusUpdate(status="open"), {"id": 2, "role": "admin"})
+        self.assertEqual(result, {"thread_id": 14, "status": "open", "closed_at": None})
+        self.assertEqual(cursor.queries[-1][1], ("open", "open", 14))
+        self.assertIn("ELSE NULL END", cursor.queries[-1][0])
+
+    def test_status_validation_and_seller_status_permission(self):
+        with self.assertRaises(ValidationError):
+            ThreadStatusUpdate(status="archived")
+        with self.assertRaises(HTTPException) as error:
+            update_thread_status(14, ThreadStatusUpdate(status="closed"), {"id": 9, "role": "seller"})
+        self.assertEqual(error.exception.status_code, 403)
+
+    def test_missing_thread_and_foreign_seller_cannot_read_or_send(self):
+        for row in (None, {"id": 14, "customer_user_id": 7, "seller_user_id": 9}):
+            for operation in (get_thread, send_message):
+                with self.subTest(row=row, operation=operation.__name__):
+                    cursor = FakeCursor(rows=[row])
+                    connection = FakeConnection(cursor)
+                    with patch("routers.support.get_connection", return_value=connection):
+                        with self.assertRaises(HTTPException) as error:
+                            if operation is get_thread:
+                                operation(14, {"id": 10, "role": "seller"})
+                            else:
+                                operation(14, MessageCreate(message="Yanıt"), {"id": 10, "role": "seller"})
+                    self.assertEqual(error.exception.status_code, 404)
+                    self.assertEqual(len(cursor.queries), 1)
+                    self.assertFalse(connection.committed)
+
+    def test_empty_thread_read_records_zero_and_admin_keeps_emails(self):
+        cursor = FakeCursor(rows=[{"id": 14, "customer_email": "c@example.com", "unread_count": 5}], many=[[]])
+        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+            result = get_thread(14, {"id": 2, "role": "admin"})
+        self.assertEqual(cursor.queries[-1][1], (14, 2, 0))
+        self.assertEqual(result["thread"]["unread_count"], 0)
+        self.assertEqual(result["thread"]["customer_email"], "c@example.com")
+
+    def test_seller_read_hides_emails_and_admin_name(self):
+        cursor = FakeCursor(rows=[{"id": 14, "customer_user_id": None, "seller_user_id": 9,
+                                   "seller_email": "s@example.com", "customer_email": None}],
+                            many=[[{"id": 52, "sender_role": "admin", "sender_name": "Yönetici"}]])
+        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+            result = get_thread(14, {"id": 9, "role": "seller"})
+        self.assertFalse(any(key.endswith("_email") for key in result["thread"]))
+        self.assertEqual(result["messages"][0]["sender_name"], "Admin")
+        self.assertEqual(cursor.queries[-1][1], (14, 9, 52))
+
+    def test_seller_unread_includes_only_owned_threads_and_other_senders(self):
+        cursor = FakeCursor(rows=[{"unread_count": 4}])
+        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+            self.assertEqual(my_unread_count({"id": 9, "role": "seller"}), {"unread_count": 4})
+        sql, params = cursor.queries[0]
+        self.assertEqual(params, (9, 9, 9))
+        self.assertIn("T.SELLER_USER_ID = %S", sql)
+        self.assertIn("M.SENDER_USER_ID <> %S", sql)
+        self.assertIn("M.ID > COALESCE(R.LAST_READ_MESSAGE_ID, 0)", sql)
+        self.assertNotIn("T.STATUS =", sql)  # Kapalı konuşmaların okunmamış mesajları da sayılır.
+
+    def test_unread_endpoints_reject_wrong_roles(self):
+        for operation, role in ((my_unread_count, "admin"), (admin_unread_count, "customer"), (admin_unread_count, "seller")):
+            with self.subTest(operation=operation.__name__, role=role):
+                with self.assertRaises(HTTPException) as error:
+                    operation({"id": 7, "role": role})
+                self.assertEqual(error.exception.status_code, 403)
+
+    def test_default_and_all_status_filters_for_each_inbox(self):
+        for role in ("customer", "seller"):
+            for channel in ("support", "questions"):
+                for status in ("open", "closed", "all"):
+                    with self.subTest(role=role, channel=channel, status=status):
+                        cursor = FakeCursor(many=[[]])
+                        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+                            if status == "open":
+                                list_my_threads(channel, {"id": 7, "role": role})
+                            else:
+                                list_my_threads(channel, {"id": 7, "role": role}, status)
+                        sql, params = cursor.queries[0]
+                        self.assertEqual(params[-2:], (status, status))
+                        self.assertIn("(%S = 'ALL' OR T.STATUS = %S)", sql)
+                        self.assertIn("UNREAD.SENDER_USER_ID <> %S", sql)
+                        self.assertIn("UNREAD.ID > COALESCE(READS.LAST_READ_MESSAGE_ID, 0)", sql)
+                        self.assertIn("LAST_SENDER_ROLE", sql)
+                        self.assertIn("T.SELLER_USER_ID = %S" if role == "seller" else "T.CUSTOMER_USER_ID = %S", sql)
+                        self.assertEqual(params[3], ["product_question"] if channel == "questions" else
+                                         ["customer_support"] if role == "customer" else ["seller_support", "product_moderation"])
+        cursor = FakeCursor(many=[[{"customer_email": "c@example.com"}]])
+        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+            result = list_admin_threads("customer", {"id": 2, "role": "admin"}, "all")
+        self.assertEqual(cursor.queries[0][1][-2:], ("all", "all"))
+        self.assertEqual(result[0]["customer_email"], "c@example.com")
+
+    def test_tenth_message_is_allowed_but_reply_limit_rolls_back(self):
+        for count in (9, 10):
+            with self.subTest(count=count):
+                cursor = FakeCursor(rows=[{"id": 14, "customer_user_id": 7, "seller_user_id": None},
+                                          {"message_count": count}, {"id": 52, "created_at": datetime.now(timezone.utc)}])
+                connection = FakeConnection(cursor)
+                with patch("routers.support.get_connection", return_value=connection):
+                    if count == 9:
+                        self.assertEqual(send_message(14, MessageCreate(message="Yanıt"), {"id": 7, "role": "customer"})["id"], 52)
+                    else:
+                        with self.assertRaises(HTTPException) as error:
+                            send_message(14, MessageCreate(message="Yanıt"), {"id": 7, "role": "customer"})
+                        self.assertEqual(error.exception.status_code, 429)
+                self.assertEqual(connection.committed, count == 9)
+                self.assertIn("PG_ADVISORY_XACT_LOCK", cursor.queries[1][0])
+                self.assertIn("INTERVAL '1 MINUTE'", cursor.queries[2][0])
+
+    def test_seller_contact_reuses_thread_and_reopens_it(self):
+        cursor = FakeCursor(rows=[{"message_count": 0}, None, {"id": 14},
+                                  {"id": 52, "created_at": datetime.now(timezone.utc)}])
+        with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+            result = contact_seller_support(MessageCreate(message="Yardım"), {"id": 9, "role": "seller"})
+        self.assertEqual(result["thread_id"], 14)
+        self.assertEqual(cursor.queries[2][1], ("seller_support", None, 9, None))
+        self.assertIn("STATUS = 'OPEN', CLOSED_AT = NULL", cursor.queries[-1][0])
+
+    def test_product_question_checks_availability_and_uses_message_limit(self):
+        product_cursor = FakeCursor(rows=[{"owner_user_id": 9}])
+        message_cursor = FakeCursor(rows=[{"message_count": 10}])
+        with patch("routers.support.get_connection", side_effect=[FakeConnection(product_cursor), FakeConnection(message_cursor)]):
+            with self.assertRaises(HTTPException) as error:
+                ask_product_question(12, MessageCreate(message="Soru"), {"id": 7, "role": "customer"})
+        self.assertEqual(error.exception.status_code, 429)
+        self.assertIn("P.IS_ACTIVE = TRUE", product_cursor.queries[0][0])
+        self.assertIn("S.APPROVAL_STATUS = 'APPROVED'", product_cursor.queries[0][0])
+
+    def test_product_question_creates_thread_for_product_owner(self):
+        product_cursor = FakeCursor(rows=[{"owner_user_id": 9}])
+        message_cursor = FakeCursor(rows=[{"message_count": 0}, {"id": 14},
+                                          {"id": 52, "created_at": datetime.now(timezone.utc)}])
+        with patch("routers.support.get_connection", side_effect=[FakeConnection(product_cursor), FakeConnection(message_cursor)]):
+            result = ask_product_question(12, MessageCreate(message="Soru"), {"id": 7, "role": "customer"})
+        self.assertEqual(result, {"thread_id": 14, "message_id": 52})
+        self.assertEqual(message_cursor.queries[2][1], ("product_question", 7, 9, 12))
+
+    def test_missing_product_question_and_missing_status_thread_return_404(self):
+        for operation in ("question", "status"):
+            with self.subTest(operation=operation):
+                cursor = FakeCursor(rows=[None])
+                with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
+                    with self.assertRaises(HTTPException) as error:
+                        if operation == "question":
+                            ask_product_question(12, MessageCreate(message="Soru"), {"id": 7, "role": "customer"})
+                        else:
+                            update_thread_status(14, ThreadStatusUpdate(status="open"), {"id": 2, "role": "admin"})
+                self.assertEqual(error.exception.status_code, 404)
+                self.assertEqual(len(cursor.queries), 1)
 
 
 if __name__ == "__main__":

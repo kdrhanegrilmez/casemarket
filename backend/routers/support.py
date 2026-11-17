@@ -291,7 +291,7 @@ def _unread_count(user, *, admin=False):
         _require_role(user, "admin")
     if not admin and user["role"] not in ("customer", "seller"):
         raise HTTPException(status_code=403, detail="Bu destek alanına erişim yetkiniz yok.")
-    owner_filter = "TRUE" if admin else (
+    owner_filter = "t.kind IN ('customer_support', 'seller_support', 'product_moderation')" if admin else (
         "t.customer_user_id = %s" if user["role"] == "customer" else "t.seller_user_id = %s"
     )
     params = (user["id"], user["id"]) if admin else (user["id"], user["id"], user["id"])
