@@ -37,3 +37,5 @@
 .thread-center__reply textarea { flex: 1; min-width: 0; }
 .thread-center__reply button { white-space: nowrap; }
 @media (max-width: 650px) { .thread-center__layout { grid-template-columns: 1fr; } .thread-center__list { display: flex; max-height: 110px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--thread-border); } .thread-center__list button { min-width: 165px; width: 165px; border-right: 1px solid var(--thread-border); border-bottom: 0; } }
+.thread-center__completed { margin: 0; padding: 16px; border-top: 1px solid var(--thread-border); color: var(--thread-muted); background: var(--thread-surface); font-size: 12px; line-height: 1.6; }
+.thread-center__completed small { display: block; margin-top: 4px; }

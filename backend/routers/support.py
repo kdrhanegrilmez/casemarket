@@ -49,7 +49,6 @@ def _check_message_limit(cursor, user_id):
 def _create_or_reply(kind, user, message, *, customer_id=None, seller_id=None, product_id=None):
     with get_connection() as connection:
         with connection.cursor(row_factory=dict_row) as cursor:
-            _check_message_limit(cursor, user["id"])
             cursor.execute(
                 """
                 INSERT INTO support_threads (kind, customer_user_id, seller_user_id, product_id)
@@ -63,21 +62,25 @@ def _create_or_reply(kind, user, message, *, customer_id=None, seller_id=None, p
             if created is None:
                 cursor.execute(
                     """
-                    SELECT id FROM support_threads
+                    SELECT id, status FROM support_threads
                     WHERE kind = %s
                       AND customer_user_id IS NOT DISTINCT FROM %s
                       AND seller_user_id IS NOT DISTINCT FROM %s
                       AND product_id IS NOT DISTINCT FROM %s
+                    FOR UPDATE
                     """,
                     (kind, customer_id, seller_id, product_id),
                 )
                 existing = cursor.fetchone()
                 if existing is None:
                     raise HTTPException(status_code=409, detail="Konuşma oluşturulamadı.")
+                if existing["status"] == "closed":
+                    raise HTTPException(status_code=409, detail="Bu destek sonlandırıldı. Bu görüşmeye yeni mesaj gönderilemez.")
                 thread_id = existing["id"]
             else:
                 thread_id = created["id"]
 
+            _check_message_limit(cursor, user["id"])
             cursor.execute(
                 """
                 INSERT INTO support_messages (thread_id, sender_user_id, body)
@@ -88,7 +91,7 @@ def _create_or_reply(kind, user, message, *, customer_id=None, seller_id=None, p
             )
             sent = cursor.fetchone()
             cursor.execute(
-                "UPDATE support_threads SET updated_at = %s, status = 'open', closed_at = NULL WHERE id = %s",
+                "UPDATE support_threads SET updated_at = %s WHERE id = %s",
                 (sent["created_at"], thread_id),
             )
     return {"thread_id": thread_id, "message_id": sent["id"]}
@@ -204,9 +207,9 @@ def list_admin_threads(
             return cursor.fetchall()
 
 
-def _get_thread(cursor, thread_id, user):
+def _get_thread(cursor, thread_id, user, *, lock=False):
     cursor.execute(
-        THREAD_LIST_SQL + " WHERE t.id = %s",
+        THREAD_LIST_SQL + " WHERE t.id = %s" + (" FOR UPDATE OF t" if lock else ""),
         (user["id"], user["id"], thread_id),
     )
     thread = cursor.fetchone()
@@ -269,7 +272,9 @@ def send_message(
 ):
     with get_connection() as connection:
         with connection.cursor(row_factory=dict_row) as cursor:
-            _get_thread(cursor, thread_id, user)
+            thread = _get_thread(cursor, thread_id, user, lock=True)
+            if thread["status"] == "closed":
+                raise HTTPException(status_code=409, detail="Bu destek sonlandırıldı. Bu görüşmeye yeni mesaj gönderilemez.")
             _check_message_limit(cursor, user["id"])
             cursor.execute(
                 """
@@ -281,7 +286,7 @@ def send_message(
             )
             message = cursor.fetchone()
             cursor.execute(
-                "UPDATE support_threads SET updated_at = %s, status = 'open', closed_at = NULL WHERE id = %s",
+                "UPDATE support_threads SET updated_at = %s WHERE id = %s",
                 (message["created_at"], thread_id),
             )
     return {"id": message["id"], "thread_id": thread_id, "created_at": message["created_at"]}
@@ -330,7 +335,7 @@ def update_thread_status(
     _require_role(admin, "admin")
     with get_connection() as connection:
         with connection.cursor(row_factory=dict_row) as cursor:
-            _get_thread(cursor, thread_id, admin)
+            _get_thread(cursor, thread_id, admin, lock=True)
             cursor.execute(
                 """UPDATE support_threads
                    SET status = %s, closed_at = CASE WHEN %s = 'closed' THEN NOW() ELSE NULL END

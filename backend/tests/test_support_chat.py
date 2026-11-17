@@ -67,14 +67,14 @@ class SupportChatTests(unittest.TestCase):
             MessageCreate(message="   ")
 
     def test_customer_message_is_attached_to_customer_thread(self):
-        cursor = FakeCursor([{"message_count": 0}, {"id": 14}, {"id": 51, "created_at": datetime.now(timezone.utc)}])
+        cursor = FakeCursor([{"id": 14}, {"message_count": 0}, {"id": 51, "created_at": datetime.now(timezone.utc)}])
         connection = FakeConnection(cursor)
         with patch("routers.support.get_connection", return_value=connection):
             result = contact_customer_support(MessageCreate(message="  Siparişim hakkında soru  "), {"id": 7, "role": "customer"})
 
         self.assertTrue(connection.committed)
         self.assertEqual(result["thread_id"], 14)
-        self.assertEqual(cursor.queries[2][1], ("customer_support", 7, None, None))
+        self.assertEqual(cursor.queries[0][1], ("customer_support", 7, None, None))
         self.assertEqual(cursor.queries[3][1], (14, 7, "Siparişim hakkında soru"))
 
     def test_other_customer_cannot_read_thread(self):
@@ -141,22 +141,23 @@ class SupportChatTests(unittest.TestCase):
         self.assertNotIn("customer_email", result[0])
 
     def test_message_limit_returns_429_before_insert(self):
-        cursor = FakeCursor(rows=[{"message_count": 10}])
+        cursor = FakeCursor(rows=[{"id": 14}, {"message_count": 10}])
         with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
             with self.assertRaises(HTTPException) as error:
                 contact_customer_support(MessageCreate(message="Merhaba"), {"id": 7, "role": "customer"})
         self.assertEqual(error.exception.status_code, 429)
         self.assertFalse(any("INSERT INTO SUPPORT_MESSAGES" in sql for sql, _ in cursor.queries))
 
-    def test_reply_reopens_closed_thread(self):
+    def test_reply_to_open_thread_does_not_change_status(self):
         cursor = FakeCursor(rows=[
-            {"id": 14, "customer_user_id": 7, "seller_user_id": None},
+            {"id": 14, "customer_user_id": 7, "seller_user_id": None, "status": "open"},
             {"message_count": 0},
             {"id": 52, "created_at": datetime.now(timezone.utc)},
         ])
         with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
             send_message(14, MessageCreate(message="Yanıt"), {"id": 7, "role": "customer"})
-        self.assertIn("STATUS = 'OPEN'", cursor.queries[-1][0])
+        self.assertNotIn("STATUS =", cursor.queries[-1][0])
+        self.assertIn("FOR UPDATE OF T", cursor.queries[0][0])
 
     def test_admin_can_close_and_reopen_thread(self):
         cursor = FakeCursor(rows=[
@@ -269,7 +270,7 @@ class SupportChatTests(unittest.TestCase):
     def test_tenth_message_is_allowed_but_reply_limit_rolls_back(self):
         for count in (9, 10):
             with self.subTest(count=count):
-                cursor = FakeCursor(rows=[{"id": 14, "customer_user_id": 7, "seller_user_id": None},
+                cursor = FakeCursor(rows=[{"id": 14, "customer_user_id": 7, "seller_user_id": None, "status": "open"},
                                           {"message_count": count}, {"id": 52, "created_at": datetime.now(timezone.utc)}])
                 connection = FakeConnection(cursor)
                 with patch("routers.support.get_connection", return_value=connection):
@@ -283,18 +284,18 @@ class SupportChatTests(unittest.TestCase):
                 self.assertIn("PG_ADVISORY_XACT_LOCK", cursor.queries[1][0])
                 self.assertIn("INTERVAL '1 MINUTE'", cursor.queries[2][0])
 
-    def test_seller_contact_reuses_thread_and_reopens_it(self):
-        cursor = FakeCursor(rows=[{"message_count": 0}, None, {"id": 14},
+    def test_seller_contact_reuses_open_thread(self):
+        cursor = FakeCursor(rows=[None, {"id": 14, "status": "open"}, {"message_count": 0},
                                   {"id": 52, "created_at": datetime.now(timezone.utc)}])
         with patch("routers.support.get_connection", return_value=FakeConnection(cursor)):
             result = contact_seller_support(MessageCreate(message="Yardım"), {"id": 9, "role": "seller"})
         self.assertEqual(result["thread_id"], 14)
-        self.assertEqual(cursor.queries[2][1], ("seller_support", None, 9, None))
-        self.assertIn("STATUS = 'OPEN', CLOSED_AT = NULL", cursor.queries[-1][0])
+        self.assertEqual(cursor.queries[0][1], ("seller_support", None, 9, None))
+        self.assertNotIn("STATUS =", cursor.queries[-1][0])
 
     def test_product_question_checks_availability_and_uses_message_limit(self):
         product_cursor = FakeCursor(rows=[{"owner_user_id": 9}])
-        message_cursor = FakeCursor(rows=[{"message_count": 10}])
+        message_cursor = FakeCursor(rows=[{"id": 14}, {"message_count": 10}])
         with patch("routers.support.get_connection", side_effect=[FakeConnection(product_cursor), FakeConnection(message_cursor)]):
             with self.assertRaises(HTTPException) as error:
                 ask_product_question(12, MessageCreate(message="Soru"), {"id": 7, "role": "customer"})
@@ -305,12 +306,36 @@ class SupportChatTests(unittest.TestCase):
 
     def test_product_question_creates_thread_for_product_owner(self):
         product_cursor = FakeCursor(rows=[{"owner_user_id": 9}])
-        message_cursor = FakeCursor(rows=[{"message_count": 0}, {"id": 14},
+        message_cursor = FakeCursor(rows=[{"id": 14}, {"message_count": 0},
                                           {"id": 52, "created_at": datetime.now(timezone.utc)}])
         with patch("routers.support.get_connection", side_effect=[FakeConnection(product_cursor), FakeConnection(message_cursor)]):
             result = ask_product_question(12, MessageCreate(message="Soru"), {"id": 7, "role": "customer"})
         self.assertEqual(result, {"thread_id": 14, "message_id": 52})
-        self.assertEqual(message_cursor.queries[2][1], ("product_question", 7, 9, 12))
+        self.assertEqual(message_cursor.queries[0][1], ("product_question", 7, 9, 12))
+
+    def test_completed_support_rejects_messages_from_every_participant(self):
+        for user in ({"id": 7, "role": "customer"}, {"id": 9, "role": "seller"}, {"id": 2, "role": "admin"}):
+            with self.subTest(user=user):
+                cursor = FakeCursor(rows=[{"id": 14, "customer_user_id": 7, "seller_user_id": 9, "status": "closed"}])
+                connection = FakeConnection(cursor)
+                with patch("routers.support.get_connection", return_value=connection):
+                    with self.assertRaises(HTTPException) as error:
+                        send_message(14, MessageCreate(message="Yanıt"), user)
+                self.assertEqual(error.exception.status_code, 409)
+                self.assertFalse(connection.committed)
+                self.assertEqual(len(cursor.queries), 1)
+
+    def test_contact_endpoints_cannot_reopen_completed_support(self):
+        for operation, user in ((contact_customer_support, {"id": 7, "role": "customer"}),
+                                (contact_seller_support, {"id": 9, "role": "seller"})):
+            cursor = FakeCursor(rows=[None, {"id": 14, "status": "closed"}])
+            connection = FakeConnection(cursor)
+            with patch("routers.support.get_connection", return_value=connection):
+                with self.assertRaises(HTTPException) as error:
+                    operation(MessageCreate(message="Tekrar yardım"), user)
+            self.assertEqual(error.exception.status_code, 409)
+            self.assertFalse(connection.committed)
+            self.assertFalse(any("INSERT INTO SUPPORT_MESSAGES" in sql for sql, _ in cursor.queries))
 
     def test_missing_product_question_and_missing_status_thread_return_404(self):
         for operation in ("question", "status"):

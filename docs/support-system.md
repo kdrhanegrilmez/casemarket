@@ -36,7 +36,12 @@ Eski `seller_notifications` tablosu ve bildirim API'leri korunur; arayüz bunlar
   `GET /api/support/admin/unread-count`: müşteri desteği, satıcı desteği ve moderasyon toplamı.
   Kapalı konuşmaların okunmamış mesajları da toplamda yer alır.
 - `PATCH /api/support/threads/{id}/status`: yalnızca admin, `{ "status": "open" }`
-  veya `{ "status": "closed" }`. Yeni mesaj konuşmayı açar ve `closed_at` alanını temizler.
+  veya `{ "status": "closed" }`. Kapalı durum arayüzde **Sonlandırıldı** olarak gösterilir.
+  Sonlandırılan desteğe admin dahil hiçbir katılımcı mesaj gönderemez (`409`).
+  `/customer` ve `/seller` üzerinden gönderim de bunu aşamaz. Devam etmek için
+  adminin **Desteği yeniden aç** işlemi gerekir; bu işlem `closed_at` alanını temizler.
+  Ürün kaldırma/geri yayınlama gibi ayrı admin moderasyon işlemleri ilgili konuşmayı yeniden açar.
+  Arşivleme ve arşiv numarası henüz eklenmemiştir.
 - Kullanıcı başına tüm destek gönderim yollarında dakikada en fazla 10 mesaj; aşımda `429`.
 - Yabancı konuşma için `404`; admin dışındakilere `*_email` alanları verilmez.
   Admin adı müşteri ve satıcıya `Admin` olarak gösterilir.
@@ -76,9 +81,11 @@ açık sohbet otomatik okunur.
    Müşteri desteği → Açık bölümünden konuşmayı okuyun. Liste rozeti ve toplam
    azalsın. Yanıt gönderin. Müşterinin Yardım rozeti artsın; konuşmayı açınca
    temizlensin ve yanıtın göndereni `Admin` görünsün.
-3. Admin: Konuşmayı kapatın. Açık listeden çıkıp Kapalı listede görünsün.
-   Yeniden açıp tekrar kapatın. Müşteri aynı kutudan mesaj gönderince Açık
-   listesine geri dönsün.
+3. Admin: **Desteği sonlandır** düğmesini kullanın. Görüşme Devam eden listesinden
+   çıkıp Sonlandırılan listesinde görünsün. Müşteri ve satıcıda mesaj kutusu kalkmalı;
+   sonlandırılma bilgisi ve salt okunur geçmiş görünmeli. Eski açık sekmeden veya
+   API'den mesaj gönderme denemesi `409` dönmeli. Admin **Desteği yeniden aç**
+   işlemini yaparsa görüşme Devam eden listesine dönmeli ve mesaj gönderilebilmeli.
 4. Müşteri: Ürün detayından satıcıya soru gönderin. Admin toplamı ürün sorusu
    nedeniyle artmamalı. Satıcı: İstatistikler yukarıda kalmalı; Ürünler /
    Siparişler / Mesajlar sekmelerinde Mesajlar rozeti görünmeli. Mesajlar →

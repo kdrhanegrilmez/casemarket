@@ -17,6 +17,7 @@ export default function ThreadCenter({ token, audience, channel, userId, initial
   const [loaded, setLoaded] = useState(false)
   const [refresh, setRefresh] = useState(0)
   const [status, setStatus] = useState('open')
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     let active = true
@@ -81,6 +82,7 @@ export default function ThreadCenter({ token, audience, channel, userId, initial
     setError('')
     try { await action(); setRefresh((value) => value + 1) }
     catch (actionError) {
+      if (actionError.status === 409) setRefresh((value) => value + 1)
       if (actionError.status === 401) onUnauthorized?.(token)
       else setError(actionError.message)
     } finally { busyRef.current = false; setBusy(false) }
@@ -104,31 +106,35 @@ export default function ThreadCenter({ token, audience, channel, userId, initial
   const currentDetail = detail?.thread.id === selectedId ? detail : null
   return <div className="thread-center">
     {error && <p className="thread-center__error" role="alert">{error}</p>}
-    {audience === 'admin' && <div className="thread-center__filters" aria-label="Konuşma durumu">
-      {[['open', 'Açık'], ['closed', 'Kapalı']].map(([value, label]) => <button type="button" key={value} disabled={busy}
+    {notice && <p className="thread-center__completed" role="status">{notice}</p>}
+    {audience === 'admin' && <div className="thread-center__filters" aria-label="Destek durumu">
+      {[['open', 'Devam eden'], ['closed', 'Sonlandırılan']].map(([value, label]) => <button type="button" key={value} disabled={busy}
         aria-pressed={status === value} onClick={() => {
-          setStatus(value); setSelectedId(null); setDetail(null); setThreads([]); setLoaded(false); setDraft('')
+          setStatus(value); setSelectedId(null); setDetail(null); setThreads([]); setLoaded(false); setDraft(''); setNotice('')
         }}>{label}</button>)}
     </div>}
     <div className="thread-center__layout">
       <ThreadList threads={threads} selectedId={selectedId} audience={audience} onSelect={(id) => {
         if (id === selectedId || busy) return
-        setSelectedId(id); setDraft(''); setError('')
+        setSelectedId(id); setDraft(''); setError(''); setNotice('')
       }} />
       <div className="thread-center__conversation">
         {currentDetail ? <ThreadView detail={currentDetail} audience={audience} userId={userId}>
           {audience === 'admin' && <button type="button" className="thread-center__status-button" disabled={busy} onClick={() => perform(async () => {
             const nextStatus = currentDetail.thread.status === 'closed' ? 'open' : 'closed'
             await setThreadStatus(token, selectedId, nextStatus)
+            setNotice(nextStatus === 'closed' ? 'Destek sonlandırıldı. Görüşme geçmişine Sonlandırılan listesinden ulaşabilirsin.' : 'Destek yeniden açıldı.')
             setSelectedId(null); setDetail(null)
-          })}>{currentDetail.thread.status === 'closed' ? 'Konuşmayı yeniden aç' : 'Konuşmayı kapat'}</button>}
-          {audience === 'admin' && currentDetail.thread.kind === 'product_moderation' && currentDetail.thread.admin_hidden_at &&
+          })}>{currentDetail.thread.status === 'closed' ? 'Desteği yeniden aç' : 'Desteği sonlandır'}</button>}
+          {audience === 'admin' && currentDetail.thread.status !== 'closed' && currentDetail.thread.kind === 'product_moderation' && currentDetail.thread.admin_hidden_at &&
             <ModerationRestoreForm productId={currentDetail.thread.product_id} busy={busy} onRestore={(message) => perform(async () => {
               await restoreProduct(token, currentDetail.thread.product_id, message)
               onRestored?.()
             })} />}
         </ThreadView> : <p className="thread-center__placeholder">{!loaded || (selectedId && selectedId !== 'new-support') ? 'Konuşma yükleniyor...' : canCreate ? (productId ? `Ürün #${productId} için ilk sorunu yaz.` : 'Destek almak için ilk mesajını yaz.') : 'Bir konuşma seç.'}</p>}
-        {(currentDetail || canCreate) && <MessageComposer value={draft} onChange={setDraft} onSend={send} busy={busy} />}
+        {currentDetail?.thread.status === 'closed' && <p className="thread-center__completed" role="status">Bu destek sonlandırıldı. Görüşme geçmişini okuyabilirsin; yeni mesaj gönderilemez.
+          {currentDetail.thread.closed_at && <small>Sonlandırılma: {new Date(currentDetail.thread.closed_at).toLocaleString('tr-TR')}</small>}</p>}
+        {((currentDetail && currentDetail.thread.status !== 'closed') || canCreate) && <MessageComposer value={draft} onChange={setDraft} onSend={send} busy={busy} />}
       </div>
     </div>
   </div>
