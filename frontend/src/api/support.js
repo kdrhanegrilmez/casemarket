@@ -14,13 +14,13 @@ export async function supportRequest(token, path, options = {}) {
   return data
 }
 
-export const listThreads = (token, audience, channel, status = 'all') => supportRequest(token,
-  `/support/${audience === 'admin' ? 'admin' : 'my'}/threads?${new URLSearchParams({ channel, status })}`)
-export const getUnreadCount = (token, audience) => supportRequest(token, `/support/${audience === 'admin' ? 'admin' : 'my'}/unread-count`)
+export const listThreads = (token, audience, channel, status = 'all', signal) => supportRequest(token,
+  `/support/${audience === 'admin' ? 'admin' : 'my'}/threads?${new URLSearchParams({ channel, status })}`, { signal })
+export const getUnreadCount = (token, audience, signal) => supportRequest(token, `/support/${audience === 'admin' ? 'admin' : 'my'}/unread-count`, { signal })
 export const setThreadStatus = (token, id, status) => supportRequest(token, `/support/threads/${id}/status`, {
   method: 'PATCH', body: JSON.stringify({ status }),
 })
-export const getThread = (token, id) => supportRequest(token, `/support/threads/${id}`)
+export const getThread = (token, id, signal) => supportRequest(token, `/support/threads/${id}`, { signal })
 export const sendThreadMessage = (token, id, message) => supportRequest(token, `/support/threads/${id}/messages`, {
   method: 'POST', body: JSON.stringify({ message }),
 })

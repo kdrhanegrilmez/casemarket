@@ -1,7 +1,7 @@
 .customer-support-widget { position: fixed; right: 22px; bottom: 20px; z-index: 90; display: grid; justify-items: end; gap: 10px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
 .customer-support-widget__trigger { padding: 13px 20px; border: 1px solid #476052; border-radius: 100px; background: #23382d; color: #fff; box-shadow: 0 10px 30px #151f1833; font-size: 13px; font-weight: 700; cursor: pointer; }
 .customer-support-widget__trigger span { margin-right: 5px; color: #d7c1a3; }
-.customer-support-widget__panel { width: min(410px, calc(100vw - 24px)); max-height: min(760px, 78vh); overflow-y: auto; border: 1px solid #d7d2c8; border-radius: 16px; background: #fffefa; box-shadow: 0 16px 55px #171e1950; color: #27312b; }
+.customer-support-widget__panel { box-sizing: border-box; width: min(410px, calc(100vw - 24px)); max-height: min(760px, 78vh); overflow-y: auto; border: 1px solid #d7d2c8; border-radius: 16px; background: #fffefa; box-shadow: 0 16px 55px #171e1950; color: #27312b; }
 .customer-support-widget__heading { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; background: #22372b; color: #fff; }
 .customer-support-widget__heading div { display: grid; gap: 4px; }
 .customer-support-widget__heading small { color: #d9c3a6; font-size: 9px; letter-spacing: .16em; }
@@ -12,6 +12,12 @@
 .customer-support-widget__tabs button.active { background: #27362e; color: #fff; }
 .customer-support-widget .thread-center { padding: 12px; }
 .customer-support-widget .thread-center__layout { min-height: 350px; }
+.customer-support-widget .thread-center__layout { grid-template-columns: 1fr; }
+.customer-support-widget .thread-center__list { display: flex; max-height: 115px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--thread-border); }
+.customer-support-widget .thread-center__list button { flex: 0 0 190px; border-right: 1px solid var(--thread-border); border-bottom: 0; }
+.customer-support-widget .thread-center__toolbar { gap: 8px; }
+.customer-support-widget .thread-center__filters { flex: 1 1 100%; }
+.customer-support-widget .thread-center__filters button { flex: 1; padding: 8px; }
 .customer-support-widget .thread-center__conversation { min-height: 350px; }
 .customer-support-widget .thread-center__messages { max-height: 250px; }
 .customer-support-widget__login { padding: 22px; }

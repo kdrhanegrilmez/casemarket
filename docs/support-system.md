@@ -2,8 +2,12 @@
 
 Müşterinin Yardım paneli, satıcının Mesajlar sekmesi ve adminin Destek bölümü
 aynı sohbet bileşenlerini kullanır. İlk mesaj ve yanıt aynı kutudan gönderilir.
-Müşteri ve satıcı desteği kişi başına tek konuşmadır; ürün soruları müşteri ve
-ürün başına, moderasyon konuşmaları ürün başına tek kayıttır.
+Müşteri ve satıcı desteğinde kişi başına yalnızca bir **açık** görüşme bulunur.
+Sonlandırılan görüşme geçmiş olarak korunur; **Yeni destek talebi** ayrı bir kayıt
+açar. Aynı kural müşteri ve ürün başına açık ürün sorusu için de geçerlidir.
+Müşteri veya ilgili satıcı ürün sorusunu **Görüşmeyi sonlandır** ile bitirebilir.
+Müşteri aynı ürün için **Yeni soru sor** ile tekrar başlayabilir. Moderasyon
+konuşmaları ürün başına tek kayıt olmaya devam eder.
 
 ## Veritabanını hazırlama
 
@@ -17,11 +21,14 @@ python scripts/apply_seller_approval_migration.py
 python scripts/apply_product_moderation_migration.py
 python scripts/apply_support_chat_migration.py
 python scripts/apply_support_read_status_migration.py
+python scripts/apply_support_sessions_migration.py
 ```
 
 Ürün moderasyonu migration'ı destek konuşmalarından önce gelmelidir.
-Son migration `20261117_support_read_status.sql`; okundu tablosunu,
-konuşma durumunu ve hız sınırı sorgusunun indeksini oluşturur.
+`20261117_support_read_status.sql` okundu tablosunu, konuşma durumunu ve
+hız sınırı sorgusunun indeksini oluşturur. Ardından `20261117_support_sessions.sql`
+kişi/ürün tekilliklerini yalnızca açık görüşmeleri kapsayacak şekilde günceller.
+Sonlandırılmış kayıt ve mesajlar silinmez.
 Yeni kurulumda `backend/schema.sql`, ardından
 `backend/migrations/002_phone_filters.sql` uygulanır. Yeni şema destek alanlarını içerir.
 Eski `seller_notifications` tablosu ve bildirim API'leri korunur; arayüz bunları kullanmaz.
@@ -35,19 +42,27 @@ Eski `seller_notifications` tablosu ve bildirim API'leri korunur; arayüz bunlar
 - `GET /api/support/my/unread-count`: müşterinin veya satıcının toplamı.
   `GET /api/support/admin/unread-count`: müşteri desteği, satıcı desteği ve moderasyon toplamı.
   Kapalı konuşmaların okunmamış mesajları da toplamda yer alır.
-- `PATCH /api/support/threads/{id}/status`: yalnızca admin, `{ "status": "open" }`
-  veya `{ "status": "closed" }`. Kapalı durum arayüzde **Sonlandırıldı** olarak gösterilir.
+- `PATCH /api/support/threads/{id}/status`: admin `{ "status": "open" }` veya
+  `{ "status": "closed" }` gönderebilir. Ürün sorusunun müşteri ve satıcısı yalnız
+  `closed` gönderebilir; yabancı görüşme için `404`, destek/moderasyon durumunu
+  değiştirmek veya yetkisiz yeniden açmak için `403` döner.
+  Kapalı durum arayüzde **Sonlandırıldı** olarak gösterilir.
   Sonlandırılan desteğe admin dahil hiçbir katılımcı mesaj gönderemez (`409`).
-  `/customer` ve `/seller` üzerinden gönderim de bunu aşamaz. Devam etmek için
-  adminin **Desteği yeniden aç** işlemi gerekir; bu işlem `closed_at` alanını temizler.
+  `/customer`, `/seller` ve ürün sorusu oluşturma yolları kapalı geçmişi değiştirmez;
+  yeni görüşme oluşturur veya aynı kapsamdaki açık görüşmeye ekler. Adminin
+  **Desteği yeniden aç** işlemi `closed_at` alanını temizler; aynı kapsamda başka açık
+  görüşme varsa indeks kısıtı nedeniyle `409` döner.
   Ürün kaldırma/geri yayınlama gibi ayrı admin moderasyon işlemleri ilgili konuşmayı yeniden açar.
   Arşivleme ve arşiv numarası henüz eklenmemiştir.
 - Kullanıcı başına tüm destek gönderim yollarında dakikada en fazla 10 mesaj; aşımda `429`.
 - Yabancı konuşma için `404`; admin dışındakilere `*_email` alanları verilmez.
   Admin adı müşteri ve satıcıya `Admin` olarak gösterilir.
 
-Liste 15, sohbet 8 saniyede yenilenir. Arka planda polling isteği yapılmaz;
-sekme görünür olduğunda hemen yenilenir. Sayaçlar okuma sonrası ayrıca yenilenir.
+Açık liste 15, açık sohbet 8 saniyede yenilenir; her istek bittikten sonra beklenir.
+Sonlandırılan listesi ve sohbet yalnızca seçildiğinde/yenilendiğinde okunur; periyodik
+detay isteği gönderilmez. Arka planda timer ve istekler iptal edilir, sekme görünür
+olunca bir kez yenilenir. Rozetler 15 saniyede bir kontrol edilir. Sohbet okuması
+sonrası sayaç yalnızca görülen son mesaj değiştiyse ayrıca yenilenir.
 
 ## Otomatik kontroller
 
@@ -65,8 +80,30 @@ npm run build
 ```
 
 Backend testleri FakeCursor ile sorgu kapsamını, parametreleri, dönüş değerlerini,
-yetki sınırlarını ve transaction davranışını kontrol eder. Gerçek PostgreSQL
-eşzamanlılık davranışı ve tarayıcı yerleşimleri bu testlerin kapsamında değildir.
+yetki sınırlarını ve transaction davranışını kontrol eder.
+
+Gerçek PostgreSQL ve ASGI/HTTP regresyon testi (test kayıtları rollback edilir):
+
+```bash
+cd backend
+CASEMARKET_DB_TESTS=1 python -m unittest tests.test_support_sessions_database -v
+```
+
+Tarayıcı regresyon testi için frontend dev sunucusu 5173 portunda açık olmalıdır.
+Playwright proje bağımlılıklarını değiştirmeden kurulabilir:
+
+```bash
+npm install --prefix /tmp/casemarket-support-check --no-save playwright
+node /tmp/casemarket-support-check/node_modules/playwright/cli.js install chromium --only-shell
+cd frontend
+NODE_PATH=/tmp/casemarket-support-check/node_modules node tests/support-browser-check.cjs
+```
+
+Bu test gerçek React bileşenlerini mock API ile çalıştırır; müşteri/satıcı için yeni
+görüşmeyi, ürün sorusu sonlandırmayı, aktif polling sıklığını, bitmiş görüşmelerde
+polling yapılmamasını, gizli sekmeyi ve mobil panel genişliğini doğrular.
+Test HTML'i `frontend/tests/` altındadır ve üretim derlemesinin girdisi değildir.
+Ekran görüntüleri `/tmp/casemarket-support-check/` altına yazılır.
 
 ## Elle test: müşteri → admin → satıcı
 
@@ -84,13 +121,15 @@ açık sohbet otomatik okunur.
 3. Admin: **Desteği sonlandır** düğmesini kullanın. Görüşme Devam eden listesinden
    çıkıp Sonlandırılan listesinde görünsün. Müşteri ve satıcıda mesaj kutusu kalkmalı;
    sonlandırılma bilgisi ve salt okunur geçmiş görünmeli. Eski açık sekmeden veya
-   API'den mesaj gönderme denemesi `409` dönmeli. Admin **Desteği yeniden aç**
-   işlemini yaparsa görüşme Devam eden listesine dönmeli ve mesaj gönderilebilmeli.
+   API'den eski görüşmeye mesaj gönderme denemesi `409` dönmeli. Müşteri ve satıcı
+   **Yeni destek talebi** ile ayrı görüşme açabilmeli; eski mesajlar Sonlandırılan
+   listesinde kalmalı. Aynı kapsamda açık görüşme varken eskiyi yeniden açma `409` dönmeli.
 4. Müşteri: Ürün detayından satıcıya soru gönderin. Admin toplamı ürün sorusu
    nedeniyle artmamalı. Satıcı: İstatistikler yukarıda kalmalı; Ürünler /
    Siparişler / Mesajlar sekmelerinde Mesajlar rozeti görünmeli. Mesajlar →
    Müşteri soruları bölümünde soruyu okuyup yanıtlayın. Müşteri tarafında
-   yanıt mağaza adıyla görünsün.
+   yanıt mağaza adıyla görünsün. Müşteri veya satıcı **Görüşmeyi sonlandır** ile
+   soruyu bitirebilmeli. Müşteri aynı üründe yeni soru açabilmeli; eski mesajlar korunmalı.
 5. Admin: Satıcının ürününü gerekçeyle kaldırın. Satıcı: Bildirimler sekmesi
    bulunmamalı. Mesajlar → Admin / Destek altında tek moderasyon konuşmasında
    gerekçe görünmeli. Yanıt gönderin; adminin Satıcı desteği listesinde görünsün.
@@ -108,12 +147,15 @@ açık sohbet otomatik okunur.
 
 - Backend: `backend/routers/support.py`, `backend/routers/admin_dashboard.py`,
   `backend/schema.sql`, `backend/migrations/20261117_support_read_status.sql`,
-  `backend/scripts/apply_support_read_status_migration.py`.
-- Testler: `backend/tests/test_support_chat.py`, `backend/tests/test_product_moderation.py`.
+  `backend/scripts/apply_support_read_status_migration.py`,
+  `backend/migrations/20261117_support_sessions.sql`, `backend/scripts/apply_support_sessions_migration.py`.
+- Testler: `backend/tests/test_support_chat.py`, `backend/tests/test_product_moderation.py`,
+  `backend/tests/test_support_sessions_database.py`, `frontend/tests/support-browser-check.cjs`,
+  `frontend/tests/support-browser-check.html`.
 - Frontend: `frontend/src/api/support.js`, `frontend/src/components/ThreadCenter.jsx`,
   `ThreadCenter.css`, `ThreadList.jsx`, `ThreadView.jsx`, `threadTitle.js`,
   `MessageComposer.jsx`, `ModerationRestoreForm.jsx`, `UnreadBadge.jsx`,
-  `useSupportUnread.js`, `CustomerSupportWidget.jsx`, `CustomerSupportWidget.css`,
+  `useSupportUnread.js`, `useVisiblePolling.js`, `CustomerSupportWidget.jsx`, `CustomerSupportWidget.css`,
   `SellerDashboard.jsx`, `AdminDashboard.jsx` (kısa adlar `frontend/src/components/` altındadır).
 - Dokümantasyon: `ROADMAP.md`, `docs/support-system.md`.
 
