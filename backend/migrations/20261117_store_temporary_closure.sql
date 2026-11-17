@@ -1,0 +1,4 @@
+ALTER TABLE sellers
+    ADD COLUMN IF NOT EXISTS is_temporarily_closed BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS closure_reason TEXT,
+    ADD COLUMN IF NOT EXISTS closure_changed_at TIMESTAMPTZ;

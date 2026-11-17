@@ -52,7 +52,8 @@ def checkout_demo(data: OrderCreate, user: dict = Depends(get_current_user)):
                     FROM products AS p
                     JOIN sellers AS s ON s.id = p.seller_id
                     WHERE p.id = %s AND s.approval_status = 'approved'
-                    FOR UPDATE OF p""",
+                      AND s.is_temporarily_closed = FALSE
+                    FOR UPDATE OF p FOR SHARE OF s""",
                     (item.product_id,),
                 )
                 product = cursor.fetchone()

@@ -385,6 +385,7 @@ function SellerDashboard({ token, user, onBack, onUnauthorized }) {
           </div>
 
           <div className="seller-dashboard__stats">
+            {store?.is_temporarily_closed && <p className="seller-store-closure" role="status">Mağazan geçici olarak kapalı. Ürünlerin vitrinde görünmüyor; mevcut siparişlerini ve mesajlarını yönetebilirsin. Gerekçe: {store.closure_reason}</p>}
             <div>
               <span>Toplam Ürün</span>
               <strong>{products.length}</strong>

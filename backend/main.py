@@ -15,6 +15,7 @@ from routers import catalog, login, me, products, register, seller
 from routers import seller_products, orders, account, checkout
 from routers import seller_orders
 from routers import admin_dashboard, admin_sellers, support
+from routers import admin_store_status
 
 
 
@@ -123,4 +124,5 @@ app.include_router(account.router)
 app.include_router(checkout.router)
 app.include_router(admin_sellers.router)
 app.include_router(admin_dashboard.router)
+app.include_router(admin_store_status.router)
 app.include_router(support.router)

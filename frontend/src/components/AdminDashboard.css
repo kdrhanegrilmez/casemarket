@@ -225,3 +225,6 @@
   .admin-dashboard__live { display: none; }
   .admin-dashboard__chart-labels { font-size: 9px; }
 }
+.store-closure-editor { display: grid; gap: 9px; min-width: 180px; }
+.store-closure-editor > small { color: #e0bd83; white-space: normal; overflow-wrap: anywhere; }
+.store-closure-editor small[role='alert'] { color: #ffaaa5; }

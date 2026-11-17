@@ -46,6 +46,7 @@ def get_catalog_products():
                 JOIN sellers AS s ON s.id = p.seller_id
                 WHERE p.is_active = TRUE
                   AND s.approval_status = 'approved'
+                  AND s.is_temporarily_closed = FALSE
                 ORDER BY p.id
                 """
             )
@@ -89,6 +90,7 @@ def get_catalog_product_detail(product_id: int):
                     p.id = %s
                     AND p.is_active = TRUE
                     AND s.approval_status = 'approved'
+                    AND s.is_temporarily_closed = FALSE
                 """,
                 (product_id,),
             )

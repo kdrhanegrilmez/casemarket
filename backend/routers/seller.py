@@ -115,7 +115,7 @@ def get_my_store(
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT id, owner_user_id, store_name, description
+                SELECT id, owner_user_id, store_name, description, is_temporarily_closed, closure_reason
                 FROM sellers
                 WHERE owner_user_id = %s
                 """,
@@ -135,6 +135,8 @@ def get_my_store(
         "owner_user_id": store[1],
         "store_name": store[2],
         "description": store[3],
+        "is_temporarily_closed": store[4],
+        "closure_reason": store[5],
     }
 
 

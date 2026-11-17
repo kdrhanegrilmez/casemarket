@@ -6,6 +6,7 @@ import useSupportUnread from './useSupportUnread'
 import UnreadBadge from './UnreadBadge'
 import AdminApplications from './AdminApplications'
 import SellerAccessEditor from './SellerAccessEditor'
+import StoreClosureEditor from './StoreClosureEditor'
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
@@ -185,13 +186,14 @@ const sections = {
   stores: {
     title: 'Mağazalar',
     path: 'stores',
-    columns: ['ID', 'Mağaza', 'Sahibi', 'Durum', 'Ürün', 'Komisyon oranı', 'Satıcı yetkisi'],
+    columns: ['ID', 'Mağaza', 'Sahibi', 'Durum', 'Ürün', 'Komisyon oranı', 'Satıcı yetkisi', 'Mağaza yayını'],
     cells: (store, context) => [
       store.id, store.store_name, `${store.owner_name} · ${store.owner_email}`,
-      storeLabel[store.approval_status], store.product_count,
+      store.is_temporarily_closed ? `${storeLabel[store.approval_status]} · Geçici kapalı` : storeLabel[store.approval_status], store.product_count,
       <CommissionEditor store={store} {...context} />,
       store.approval_status === 'approved' ? <SellerAccessEditor sellerId={store.id} storeName={store.store_name}
         token={context.token} onUnauthorized={context.onUnauthorized} onRevoked={context.onRevoked} /> : 'Yetki kapalı',
+      <StoreClosureEditor store={store} {...context} />,
     ],
   },
   phones: {
@@ -370,10 +372,15 @@ function AdminSection({ section, token, onUnauthorized, onOpenThread }) {
       items: previous.data.items.map((store) => store.id === sellerId ? { ...store, approval_status: 'pending' } : store),
     } }))
   }
+  const onClosureSaved = (sellerId, result) => {
+    setResult((previous) => ({ ...previous, data: { ...previous.data,
+      items: previous.data.items.map((store) => store.id === sellerId ? { ...store, ...result } : store),
+    } }))
+  }
 
   return (
     <>
-      <AdminTable section={section} rows={current.data.items} context={{ token, onUnauthorized, onSaved, onRemoved, onRevoked, onOpenThread }} />
+      <AdminTable section={section} rows={current.data.items} context={{ token, onUnauthorized, onSaved, onRemoved, onRevoked, onClosureSaved, onOpenThread }} />
       {(offset > 0 || current.data.has_more) && (
         <div className="admin-dashboard__pagination">
           <button type="button" disabled={offset === 0} onClick={() => setOffset(offset - PAGE_SIZE)}>Önceki</button>

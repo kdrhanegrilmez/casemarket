@@ -496,3 +496,4 @@
   .seller-orders__card { margin: 0 16px 16px; padding: 16px; }
   .seller-orders__item { align-items: flex-start; flex-direction: column; }
 }
+.seller-store-closure { grid-column: 1 / -1; padding: 16px; border: 1px solid #dfc997; border-radius: 9px; background: #fff6df; color: #75571f; font-size: 13px; line-height: 1.6; }

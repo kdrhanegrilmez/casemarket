@@ -138,7 +138,7 @@ def list_users(
 def list_stores(limit: PageSize = 25, offset: PageOffset = 0):
     return read_page(
         """
-        SELECT s.id, s.store_name, s.approval_status,
+        SELECT s.id, s.store_name, s.approval_status, s.is_temporarily_closed, s.closure_reason,
                s.commission_rate_percent::text AS commission_rate_percent,
                u.full_name AS owner_name, u.email AS owner_email,
                (SELECT COUNT(*) FROM products WHERE seller_id = s.id) AS product_count

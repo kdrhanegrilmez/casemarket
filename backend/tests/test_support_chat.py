@@ -301,6 +301,7 @@ class SupportChatTests(unittest.TestCase):
         self.assertEqual(error.exception.status_code, 429)
         self.assertIn("P.IS_ACTIVE = TRUE", product_cursor.queries[0][0])
         self.assertIn("S.APPROVAL_STATUS = 'APPROVED'", product_cursor.queries[0][0])
+        self.assertIn("S.IS_TEMPORARILY_CLOSED = FALSE", product_cursor.queries[0][0])
 
     def test_product_question_creates_thread_for_product_owner(self):
         product_cursor = FakeCursor(rows=[{"owner_user_id": 9}])

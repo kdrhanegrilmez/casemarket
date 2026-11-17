@@ -122,6 +122,7 @@ def ask_product_question(
                 JOIN sellers AS s ON s.id = p.seller_id
                 WHERE p.id = %s AND p.is_active = TRUE
                   AND s.approval_status = 'approved'
+                  AND s.is_temporarily_closed = FALSE
                 """,
                 (product_id,),
             )

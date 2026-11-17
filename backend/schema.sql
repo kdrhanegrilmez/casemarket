@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS sellers(
     reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
     reviewed_at TIMESTAMPTZ,
     review_reason TEXT,
+    is_temporarily_closed BOOLEAN NOT NULL DEFAULT FALSE,
+    closure_reason TEXT,
+    closure_changed_at TIMESTAMPTZ,
     commission_rate_percent NUMERIC(5, 2)
         CONSTRAINT sellers_commission_rate_check
         CHECK (commission_rate_percent IS NULL OR
