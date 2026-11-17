@@ -60,6 +60,14 @@ def create_seller(
                     INSERT INTO sellers
                         (owner_user_id, store_name, description, approval_status)
                     VALUES (%s, %s, %s, 'pending')
+                    ON CONFLICT (owner_user_id) DO UPDATE
+                    SET store_name = EXCLUDED.store_name,
+                        description = EXCLUDED.description,
+                        approval_status = 'pending',
+                        reviewed_by = NULL,
+                        reviewed_at = NULL,
+                        review_reason = NULL
+                    WHERE sellers.approval_status = 'rejected'
                     RETURNING id, store_name, description, approval_status
                     """,
                     (
@@ -70,6 +78,11 @@ def create_seller(
                 )
 
                 seller = cursor.fetchone()
+                if seller is None:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Zaten bekleyen veya onaylanmış bir mağaza başvurunuz var.",
+                    )
 
     except UniqueViolation:
         raise HTTPException(

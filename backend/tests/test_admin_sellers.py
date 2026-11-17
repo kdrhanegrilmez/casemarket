@@ -61,6 +61,40 @@ class SellerApprovalTests(unittest.TestCase):
         self.assertEqual(result["approval_status"], "pending")
         self.assertFalse(any(sql.startswith("UPDATE USERS") for sql, _ in cursor.queries))
 
+    def test_rejected_application_can_be_resubmitted_without_new_store(self):
+        cursor = FakeCursor([("customer",), (12, "Yeni Mağaza", "Yeni açıklama", "pending")])
+        connection = FakeConnection(cursor)
+        with patch("routers.seller.get_connection", return_value=connection):
+            result = create_seller(SellerCreate(store_name=" Yeni Mağaza ", description=" Yeni açıklama "), {"id": 7, "role": "customer"})
+        self.assertTrue(connection.committed)
+        self.assertEqual(result["id"], 12)
+        self.assertEqual(result["approval_status"], "pending")
+        sql, params = cursor.queries[1]
+        self.assertIn("ON CONFLICT (OWNER_USER_ID) DO UPDATE", sql)
+        self.assertIn("WHERE SELLERS.APPROVAL_STATUS = 'REJECTED'", sql)
+        self.assertIn("REVIEWED_BY = NULL", sql)
+        self.assertIn("REVIEWED_AT = NULL", sql)
+        self.assertIn("REVIEW_REASON = NULL", sql)
+        self.assertEqual(params, (7, "Yeni Mağaza", "Yeni açıklama"))
+        self.assertFalse(any(sql.startswith("UPDATE USERS") for sql, _ in cursor.queries))
+
+    def test_pending_or_approved_application_cannot_be_resubmitted(self):
+        cursor = FakeCursor([("customer",), None])
+        connection = FakeConnection(cursor)
+        with patch("routers.seller.get_connection", return_value=connection):
+            with self.assertRaises(HTTPException) as error:
+                create_seller(SellerCreate(store_name="Mağaza"), {"id": 7, "role": "customer"})
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertTrue(connection.rolled_back)
+
+    def test_resubmission_rechecks_role_under_lock(self):
+        cursor = FakeCursor([("seller",)])
+        with patch("routers.seller.get_connection", return_value=FakeConnection(cursor)):
+            with self.assertRaises(HTTPException) as error:
+                create_seller(SellerCreate(store_name="Mağaza"), {"id": 7, "role": "customer"})
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertEqual(len(cursor.queries), 1)
+
     def test_approved_decision_is_a_valid_model(self):
         decision = SellerApplicationReview.model_validate({"decision": "approved"})
         self.assertEqual(decision.decision, "approved")

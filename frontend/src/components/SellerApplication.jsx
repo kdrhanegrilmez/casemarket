@@ -52,6 +52,7 @@ export default function SellerApplication({ token, user, onUserChange, onSellerO
 
   async function submit(event) {
     event.preventDefault()
+    if (busy) return
     setBusy(true)
     setError('')
     const values = Object.fromEntries(new FormData(event.currentTarget).entries())
@@ -71,13 +72,13 @@ export default function SellerApplication({ token, user, onUserChange, onSellerO
       </div>
     </div>}
     {application?.approval_status === 'pending' && <p>{application.reviewed_at ? 'Satıcı yetkin geri alındı. Mağazan yeniden incelemede.' : 'Başvurun inceleniyor. Sonucu görmek için durumu yenileyebilirsin.'}</p>}
-    {application?.approval_status === 'rejected' && <p>Bu başvuru sonuçlandırıldı.</p>}
+    {application?.approval_status === 'rejected' && <p>Ret gerekçesine göre bilgilerini düzenleyip yeniden başvurabilirsin.</p>}
     {application?.approval_status === 'approved' && <button type="button" className="button button--dark" onClick={onSellerOpen}>Satıcı paneline gir ↗</button>}
-    {!loading && !application && !error && user.role === 'customer' && <form className="account-form" onSubmit={submit}>
+    {!loading && (!application || application.approval_status === 'rejected') && user.role === 'customer' && <form key={application?.id || 'new'} className="account-form" onSubmit={submit}>
       <p>Mağaza açmak için başvuru gönder. Admin onayından sonra satıcı panelin açılır.</p>
-      <label>Mağaza adı<input name="store_name" minLength="3" required /></label>
-      <label>Mağaza açıklaması<textarea name="description" rows="3" /></label>
-      <button className="button button--dark" disabled={busy}>{busy ? 'Gönderiliyor...' : 'Başvuru gönder'}</button>
+      <label>Mağaza adı<input name="store_name" defaultValue={application?.store_name || ''} minLength="3" maxLength="120" required disabled={busy} /></label>
+      <label>Mağaza açıklaması<textarea name="description" defaultValue={application?.description || ''} maxLength="1000" rows="3" disabled={busy} /></label>
+      <button className="button button--dark" disabled={busy}>{busy ? 'Gönderiliyor...' : application ? 'Yeniden başvur' : 'Başvuru gönder'}</button>
     </form>}
     <div className="seller-application__actions"><RefreshButton onClick={load} busy={busy || loading} /></div>
   </div>
