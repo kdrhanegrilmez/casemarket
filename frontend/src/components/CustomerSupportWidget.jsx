@@ -1,7 +1,10 @@
 import ThreadCenter from './ThreadCenter'
+import useSupportUnread from './useSupportUnread'
+import UnreadBadge from './UnreadBadge'
 import './CustomerSupportWidget.css'
 
 export default function CustomerSupportWidget({ token, user, open, channel, productId, onOpenChange, onChannelChange, onLogin, onUnauthorized }) {
+  const [unread, refreshUnread] = useSupportUnread(user?.role === 'customer' ? token : null, 'customer', onUnauthorized)
   return <div className="customer-support-widget">
     {open && <section className="customer-support-widget__panel" aria-label="Müşteri destek sohbeti">
       <div className="customer-support-widget__heading">
@@ -15,15 +18,15 @@ export default function CustomerSupportWidget({ token, user, open, channel, prod
           <button type="button" role="tab" aria-selected={channel === 'questions'} className={channel === 'questions' ? 'active' : ''}
             onClick={() => onChannelChange('questions')}>Ürün sorularım</button>
         </div>
-        <ThreadCenter key={channel} token={token} audience="customer" channel={channel} userId={user.id}
-          productId={channel === 'questions' ? productId : null} onUnauthorized={onUnauthorized} />
+        <ThreadCenter key={`${channel}-${productId || ''}`} token={token} audience="customer" channel={channel} userId={user.id}
+          productId={channel === 'questions' ? productId : null} onUnauthorized={onUnauthorized} onRead={refreshUnread} />
       </> : <div className="customer-support-widget__login">
         <p>Destek mesajlarını hesabınla eşleştirmek için giriş yap.</p>
         <button type="button" onClick={onLogin}>Giriş yap</button>
       </div>}
     </section>}
     <button type="button" className="customer-support-widget__trigger" onClick={() => onOpenChange(!open)} aria-expanded={open}>
-      <span aria-hidden="true">✦</span> Yardım
+      <span aria-hidden="true">✦</span> Yardım <UnreadBadge count={unread} />
     </button>
   </div>
 }

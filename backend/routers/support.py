@@ -139,7 +139,7 @@ THREAD_LIST_SQL = """
            t.status, t.closed_at, p.name AS product_name,
            p.admin_hidden_at, p.is_active AS product_is_active,
            c.full_name AS customer_name, c.email AS customer_email,
-           s.full_name AS seller_name, s.email AS seller_email,
+           s.full_name AS seller_name, s.email AS seller_email, store.store_name,
            t.updated_at, latest.body AS last_message,
            latest_user.role AS last_sender_role,
            (SELECT COUNT(*) FROM support_messages AS unread
@@ -155,6 +155,7 @@ THREAD_LIST_SQL = """
     LEFT JOIN users AS latest_user ON latest_user.id = latest.sender_user_id
     LEFT JOIN users AS c ON c.id = t.customer_user_id
     LEFT JOIN users AS s ON s.id = t.seller_user_id
+    LEFT JOIN sellers AS store ON store.owner_user_id = t.seller_user_id
     LEFT JOIN products AS p ON p.id = t.product_id
 """
 

@@ -14,7 +14,7 @@ export default function ThreadView({ detail, audience, userId, children }) {
     </div>
     <div className="thread-center__messages" ref={messageListRef} aria-live="polite">
       {detail.messages.map((message) => <div key={message.id} className={`thread-center__message ${message.sender_user_id === userId ? 'mine' : ''}`}>
-        <small>{message.sender_role === 'admin' ? 'Admin' : message.sender_name} · {new Date(message.created_at).toLocaleString('tr-TR')}</small>
+        <small>{message.sender_role === 'admin' ? 'Admin' : audience === 'customer' && message.sender_role === 'seller' ? detail.thread.store_name || message.sender_name : message.sender_name} · {new Date(message.created_at).toLocaleString('tr-TR')}</small>
         <p>{message.body}</p>
       </div>)}
     </div>

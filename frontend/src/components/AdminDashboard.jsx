@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import './AccountPage.css'
 import './AdminDashboard.css'
 import ThreadCenter from './ThreadCenter'
+import useSupportUnread from './useSupportUnread'
+import UnreadBadge from './UnreadBadge'
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
@@ -16,6 +18,7 @@ const shippingLabel = { pending: 'Bekliyor', preparing: 'Hazırlanıyor', shippe
 const shortDate = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short' })
 
 const iconPaths = {
+  support: <path d="M21 11a8 8 0 0 1-8 8H7l-5 3V11a9 9 0 0 1 19 0ZM7 10h10M7 14h6" />,
   overview: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
   sales: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></>,
   stores: <><path d="M3 10h18l-2-6H5l-2 6Z" /><path d="M5 10v10h14V10M9 20v-6h6v6" /></>,
@@ -372,6 +375,7 @@ function AdminSection({ section, token, onUnauthorized, onOpenThread }) {
 }
 
 export default function AdminDashboard({ token, userId, onBack, onLogout, onUnauthorized }) {
+  const [unread, refreshUnread] = useSupportUnread(token, 'admin', onUnauthorized)
   const [tab, setTab] = useState('overview')
   const [supportChannel, setSupportChannel] = useState('customer')
   const [supportThreadId, setSupportThreadId] = useState(null)
@@ -404,7 +408,7 @@ export default function AdminDashboard({ token, userId, onBack, onLogout, onUnau
                 className={tab === key ? 'active' : ''}
                 aria-current={tab === key ? 'page' : undefined}
                 onClick={() => setTab(key)}
-              ><Icon name={key === 'support' ? 'users' : key} size={17} /> {sections[key].title}</button>)}
+              ><Icon name={key} size={17} /> {sections[key].title} {key === 'support' && <UnreadBadge count={unread} />}</button>)}
             </div>)}
             <button type="button" className="admin-dashboard__logout" onClick={onLogout}>Çıkış yap <span>↗</span></button>
           </nav>
@@ -424,7 +428,7 @@ export default function AdminDashboard({ token, userId, onBack, onLogout, onUnau
                   onClick={() => { setSupportChannel('seller'); setSupportThreadId(null) }}>Satıcı desteği</button>
               </div>
               <ThreadCenter key={supportChannel} token={token} audience="admin" channel={supportChannel} userId={userId}
-                initialThreadId={supportThreadId} onUnauthorized={onUnauthorized} />
+                initialThreadId={supportThreadId} onUnauthorized={onUnauthorized} onRead={refreshUnread} />
             </> : <AdminSection key={tab} section={section} token={token} onUnauthorized={onUnauthorized}
               onOpenThread={(threadId) => { setSupportChannel('seller'); setSupportThreadId(threadId); setTab('support') }} />}
           </main>

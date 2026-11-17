@@ -4,6 +4,8 @@ import './SellerDashboard.css'
 import './components.css'
 import SellerProductRow from './SellerProductRow.jsx'
 import ThreadCenter from './ThreadCenter.jsx'
+import useSupportUnread from './useSupportUnread'
+import UnreadBadge from './UnreadBadge'
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
@@ -19,6 +21,8 @@ function SellerDashboard({ token, user, onBack, onUnauthorized }) {
   const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
   const [communicationTab, setCommunicationTab] = useState('support')
+  const [dashboardTab, setDashboardTab] = useState('products')
+  const [unread, refreshUnread] = useSupportUnread(token, 'seller', onUnauthorized)
   const [shippingBusyId, setShippingBusyId] = useState(null)
   const [shippingError, setShippingError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -380,18 +384,6 @@ function SellerDashboard({ token, user, onBack, onUnauthorized }) {
             </span>
           </div>
 
-          <section className="seller-communication" aria-label="Satıcı iletişim merkezi">
-            <div className="seller-communication__tabs" role="tablist" aria-label="İletişim bölümleri">
-              <button type="button" role="tab" aria-selected={communicationTab === 'support'} className={communicationTab === 'support' ? 'active' : ''}
-                onClick={() => setCommunicationTab('support')}>Yardım ve destek</button>
-              <button type="button" role="tab" aria-selected={communicationTab === 'questions'} className={communicationTab === 'questions' ? 'active' : ''}
-                onClick={() => setCommunicationTab('questions')}>Ürün soruları</button>
-              <button type="button" className="seller-communication__refresh" onClick={() => setRefreshKey((value) => value + 1)}>↻ Yenile</button>
-            </div>
-            <ThreadCenter key={communicationTab} token={token} audience="seller"
-              channel={communicationTab} userId={user.id} onUnauthorized={onUnauthorized} />
-          </section>
-
           <div className="seller-dashboard__stats">
             <div>
               <span>Toplam Ürün</span>
@@ -410,6 +402,23 @@ function SellerDashboard({ token, user, onBack, onUnauthorized }) {
           </div>
 
           {/*yeni ürün ekleme formu*/}
+
+          <div className="seller-communication__tabs" role="tablist" aria-label="Pano bölümleri">
+            {[['products', 'Ürünler'], ['orders', 'Siparişler'], ['messages', 'Mesajlar']].map(([value, label]) => <button
+              key={value} type="button" role="tab" aria-selected={dashboardTab === value} className={dashboardTab === value ? 'active' : ''}
+              onClick={() => setDashboardTab(value)}>{label} {value === 'messages' && <UnreadBadge count={unread} />}</button>)}
+          </div>
+          {dashboardTab === 'messages' && <section className="seller-communication" aria-label="Satıcı iletişim merkezi">
+            <div className="seller-communication__tabs" role="tablist" aria-label="İletişim bölümleri">
+              <button type="button" role="tab" aria-selected={communicationTab === 'questions'} className={communicationTab === 'questions' ? 'active' : ''}
+                onClick={() => setCommunicationTab('questions')}>Müşteri soruları</button>
+              <button type="button" role="tab" aria-selected={communicationTab === 'support'} className={communicationTab === 'support' ? 'active' : ''}
+                onClick={() => setCommunicationTab('support')}>Admin / Destek</button>
+            </div>
+            <ThreadCenter key={communicationTab} token={token} audience="seller" channel={communicationTab}
+              userId={user.id} onUnauthorized={onUnauthorized} onRead={refreshUnread} />
+          </section>}
+          <div hidden={dashboardTab !== 'products'}>
 
           <section className="seller-create">
             <div className="seller-create__heading">
@@ -653,7 +662,8 @@ function SellerDashboard({ token, user, onBack, onUnauthorized }) {
             )}
           </div>
 
-          <section className="seller-orders" aria-label="Satıcı siparişleri">
+          </div>
+          <section hidden={dashboardTab !== 'orders'} className="seller-orders" aria-label="Satıcı siparişleri">
             <div className="seller-dashboard__section-heading">
               <div><span>SİPARİŞ YÖNETİMİ</span><h2>Siparişlerim</h2></div>
             </div>

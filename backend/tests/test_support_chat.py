@@ -104,7 +104,7 @@ class SupportChatTests(unittest.TestCase):
     def test_thread_read_updates_last_seen_and_hides_admin_identity(self):
         cursor = FakeCursor(
             rows=[{"id": 14, "kind": "customer_support", "customer_user_id": 7,
-                   "seller_user_id": None, "customer_email": "c@example.com", "seller_email": None}],
+                   "seller_user_id": None, "store_name": "Kılıf Mağazası", "customer_email": "c@example.com", "seller_email": None}],
             many=[[{"id": 51, "sender_user_id": 2, "sender_name": "Yönetici Adı",
                    "sender_role": "admin", "body": "Merhaba"}]],
         )
@@ -113,6 +113,7 @@ class SupportChatTests(unittest.TestCase):
             result = get_thread(14, {"id": 7, "role": "customer"})
         self.assertEqual(result["messages"][0]["sender_name"], "Admin")
         self.assertNotIn("customer_email", result["thread"])
+        self.assertEqual(result["thread"]["store_name"], "Kılıf Mağazası")
         self.assertEqual(cursor.queries[-1][1], (14, 7, 51))
         self.assertIn("GREATEST", cursor.queries[-1][0])
         self.assertEqual(len(cursor.queries), 3)
