@@ -25,6 +25,7 @@ __pycache__/
 
 # Local backups
 App.jwt-yedek.jsx
+/casemarket-inceleme.zip
 
 # IDE
 .idea/

@@ -2,17 +2,19 @@
 
 **React, FastAPI ve PostgreSQL ile geliştirilen çok satıcılı telefon kılıfı pazaryeri.**
 
-CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulamasıdır. Amaç; müşterilerin farklı mağazalardaki telefon kılıflarını keşfedebildiği, satıcıların kendi ürünlerini yönetebildiği ve ileride yöneticilerin siparişleri takip edebildiği bir pazaryeri oluşturmaktır.
+CaseMarket, üniversite projesi kapsamında geliştirilen bir e-ticaret uygulamasıdır. Müşteriler farklı mağazalardaki telefon kılıflarını keşfedebilir, satıcılar ürün ve siparişlerini yönetebilir, yöneticiler pazaryerini denetleyebilir.
 
-> **Proje durumu:** Giriş/kayıt, ürün vitrini, sepet, demo sipariş, satıcı ürün yönetimi ve ürün kalemi bazında kargo durumu geliştirildi. Gerçek ödeme, kargo firması entegrasyonu, admin paneli ve canlı destek henüz tamamlanmadı.
+> **Proje durumu:** Giriş/kayıt, ürün vitrini, sepet, demo sipariş, mağaza başvurusu, satıcı ürün ve sipariş yönetimi, ürün kalemi bazında kargo takibi ve admin paneli geliştirildi. Gerçek ödeme, kargo firması entegrasyonu ve WebSocket ile canlı destek henüz tamamlanmadı.
 
 ### Hesap ve demo ödeme akışı
 
 - **Hesabım** ekranında profil bilgileri, teslimat adresleri, demo kartın yalnızca görünen bilgileri, aktif siparişler ve tüm sipariş geçmişi bulunur. Satıcı hesabında panel girişi de bu ekrandadır.
+- Müşteri **Mağaza başvurusu** bölümünden başvurur ve durumunu takip eder. Admin **Başvurular** bölümünden onay veya gerekçeli ret kararı verir.
 - Sepette adres ve demo ödeme yöntemi seçilerek sipariş tamamlanır. Gerçek ödeme alınmaz; tam kart numarası ve güvenlik kodu saklanmaz. Canlı ödeme için ayrı bir ödeme sağlayıcısı entegrasyonu gerekir.
 - Mevcut PostgreSQL veritabanını kullanan kurulumlarda bir kez `cd backend && python -m scripts.apply_account_migration` çalıştırılmalıdır. Yeni kurulumlarda `backend/schema.sql` bu alanları içerir.
 - Satıcı kargo durumu için mevcut veritabanında bir kez `cd backend && python scripts/apply_seller_shipping_migration.py` çalıştırılmalıdır. Yeni kurulumlarda sütun `backend/schema.sql` içindedir.
 - Mağaza başvurusu ve admin işlem kaydı için mevcut veritabanında `cd backend && python scripts/apply_seller_approval_migration.py` çalıştırılmalıdır. Yeni kurulumlarda alanlar `backend/schema.sql` içindedir. Önceden açılmış mağazalar onaylı kabul edilir; yeni başvurular admin kararı bekler.
+- Kargo firması ve takip numarası için mevcut veritabanında `cd backend && python scripts/apply_shipping_tracking_migration.py` çalıştırılmalıdır. Yeni kurulumlarda sütunlar `backend/schema.sql` içindedir.
 - Admin ürün kaldırma ve satıcı bildirimleri için mevcut veritabanında bir kez `cd backend && python scripts/apply_product_moderation_migration.py` çalıştırılmalıdır. Yeni kurulumlarda alanlar `backend/schema.sql` içindedir.
 - Müşteri desteği, satıcı desteği, ürün soruları ve ürün moderasyonu konuşmaları için mevcut veritabanında bir kez `cd backend && python scripts/apply_support_chat_migration.py` çalıştırılmalıdır. Yeni kurulumlarda tablolar `backend/schema.sql` içindedir.
 
@@ -132,6 +134,33 @@ Projenin ana klasöründe:
 sudo docker compose up -d db
 ```
 
+Temiz veritabanında ana şemayı ve telefon filtre tablolarını bu sırayla yükleyin:
+
+```bash
+sudo docker compose exec -T db psql -U casemarket_user -d casemarket_db < backend/schema.sql
+sudo docker compose exec -T db psql -U casemarket_user -d casemarket_db < backend/migrations/002_phone_filters.sql
+```
+
+Mevcut veritabanında migration betiklerini `backend` klasöründen sırasıyla çalıştırın. Daha önce uygulanmış adımları tekrar çalıştırmanız gerekmez; ürün moderasyonu destek konuşmalarından önce gelmelidir:
+
+```bash
+cd backend
+python -m scripts.apply_account_migration
+python scripts/apply_seller_shipping_migration.py
+python scripts/apply_seller_approval_migration.py
+python scripts/apply_product_moderation_migration.py
+python scripts/apply_support_chat_migration.py
+python scripts/apply_support_read_status_migration.py
+python scripts/apply_support_sessions_migration.py
+python scripts/apply_store_temporary_closure_migration.py
+python scripts/apply_shipping_tracking_migration.py
+```
+
+Telefon filtre tabloları eski veritabanında yoksa `backend/migrations/002_phone_filters.sql` dosyasını ayrıca uygulayın.
+
+Destek sisteminin migration sırası ve kontrol adımları [destek rehberinde](docs/support-system.md),
+geçici mağaza kapatma akışı [mağaza rehberinde](docs/store-temporary-closure.md) bulunur.
+
 ### 2. Backend'i Başlatma
 
 Yeni terminal açın:
@@ -221,6 +250,7 @@ bilgisinden alınır. Yerel ürün adları ve stoklar demo verisidir.
 | Metot | Endpoint | Açıklama |
 | --- | --- | --- |
 | POST | `/api/sellers` | Onay bekleyen mağaza başvurusu oluşturma |
+| GET | `/api/sellers/my-application` | Kendi başvurusunu ve karar gerekçesini görüntüleme |
 | GET | `/api/sellers/me` | Kendi mağazasını görüntüleme |
 | GET | `/api/sellers/me/products` | Ürünlerini listeleme |
 | POST | `/api/sellers/me/products` | Yeni ürün ekleme |
@@ -241,9 +271,19 @@ bilgisinden alınır. Yerel ürün adları ve stoklar demo verisidir.
 
 Bu uç noktalar `admin` rolü gerektirir. Ret kararında `reason` zorunludur; onayda kullanıcı satıcı rolüne geçer. Admin hesabı oluşturma arayüzü henüz eklenmemiştir.
 
+Admin, **Başvurular → Onaylanan** veya **Mağazalar** bölümünden satıcı yetkisini
+gerekçeyle geri alabilir. `PATCH /api/admin/seller-application/{seller_id}/revoke`
+uç noktası `{ "reason": "Gerekçe" }` alır (5–500 karakter). Kullanıcı müşteri rolüne
+döner; mağaza yeniden inceleme için `pending` olur ve ürünleri vitrinde görünmez.
+İşlem admin denetim kaydına yazılır. Ürün ve sipariş kayıtları korunur; admin
+Bekleyen başvurular bölümünden yeniden onay verebilir. Bu işlem yeni migration gerektirmez.
+
 Komisyon oranı mağaza bazında saklanır ve her değişiklik admin denetim kaydına yazılır. Sipariş bazında komisyon tahakkuku ve satıcı ödeme hesabı henüz uygulanmamıştır.
 
-Satıcı paneli `GET /api/sellers/me/notifications` üzerinden admin bildirimlerini gösterir; `PATCH /api/sellers/me/notifications/{notification_id}/read` ile bildirim okundu işaretlenir. Admin tarafından kaldırılan ürün satıcı tarafından yeniden yayınlanamaz.
+Satıcı panelindeki Mesajlar alanında müşteri soruları ve Admin / Destek ayrı gösterilir.
+Ürün kaldırma ve geri yayınlama mesajları aynı moderasyon konuşmasında tutulur.
+Eski bildirim API'leri geçmiş veriler için korunur; arayüz bunları kullanmaz.
+Admin tarafından kaldırılan ürün satıcı tarafından yeniden yayınlanamaz.
 
 Admin ürün kaldırdığında gerekçe satıcıyla ürün moderasyonu konuşmasına yazılır. Satıcı aynı konuşmadan yanıt verebilir; admin `PATCH /api/admin/products/{product_id}/restore` ile mesaj ekleyerek ürünü yeniden yayına alabilir. `/api/support` altındaki konuşmalar müşteri desteği, satıcı desteği ve ürün soruları olarak ayrılır.
 Müşteri site sağ altındaki yardım kutusundan destek mesajı gönderir; ürün detayından satıcıya soru sorabilir. Admin panelindeki Destek alanı müşteri ve satıcı konuşmalarını ayrı gösterir. Satıcı panelinde bildirimler, admin desteği ve ürün soruları ayrı sekmelerdedir.
@@ -283,16 +323,16 @@ Eski `/api/products` deneme yazma uç noktaları kaldırılmıştır; gerçek ü
 - [x] Mevcut ürünün görselini değiştirme
 - [ ] Satıcı ürün işlemlerinin uçtan uca testleri
 - [ ] Dosyadan ürün görseli yükleme (opsiyonel)
-- [ ] Sipariş oluşturma
-- [ ] Sipariş sırasında stok güncelleme
-- [ ] Demo ödeme akışı
-- [ ] Müşteri paneli
-- [ ] Müşteri sipariş geçmişi
-- [ ] Admin yönetim paneli
-- [ ] Mağaza ve sipariş denetimi
+- [x] Sipariş oluşturma
+- [x] Sipariş sırasında stok güncelleme
+- [x] Demo ödeme akışı
+- [x] Müşteri paneli
+- [x] Müşteri sipariş geçmişi
+- [x] Admin yönetim paneli
+- [x] Mağaza ve sipariş denetimi
 - [ ] Komisyon hesaplama
 - [ ] WebSocket ile müşteri–admin canlı destek sohbeti
-- [ ] Müşteri–satıcı özel mesajlaşması
+- [x] Ürün soruları üzerinden müşteri–satıcı mesajlaşması
 - [ ] Güvenlik ve yetkilendirme testleri
 - [ ] Mobil görünümün son düzenlemeleri
 
@@ -303,7 +343,7 @@ Eski `/api/products` deneme yazma uç noktaları kaldırılmıştır; gerçek ü
 - Kullanıcı başka satıcıya ait ürünü düzenleyemez.
 - Mevcut frontend oturum yönetimi demo amaçlı olarak `sessionStorage` kullanır.
 - Üretim ortamında HttpOnly çerez tabanlı oturum yönetimi değerlendirilecektir.
-- Sepet henüz gerçek sipariş ve ödeme işlemi oluşturmaz.
+- Sepetten demo sipariş oluşturulur ve stok güncellenir; gerçek ödeme alınmaz.
 - Projede şu an gerçek ödeme alınmamaktadır.
 - `.env`, JWT anahtarları ve veritabanı parolaları GitHub'a yüklenmemelidir.
 

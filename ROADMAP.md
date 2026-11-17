@@ -49,6 +49,7 @@ Son güncelleme: 17 Kasım 2026
 - [x] Stok kontrolü ve stok azaltma
 - [x] Çok ürünlü sipariş düzeltmesi
 - [x] Sipariş geçmişi
+- [x] Aktif siparişlerde tamamı teslim edilen siparişleri ayırma
 - [x] Bekleyen siparişlerin iptali
 - [x] İptalde stok iadesi
 - [x] 8 sipariş birim testi
@@ -64,28 +65,28 @@ Son güncelleme: 17 Kasım 2026
 - [x] Fiyat ve stok düzenleme
 - [x] Ürün görünürlüğünü değiştirme
 - [x] Ürün görsel URL yönetimi
-- [ ] Satıcıya gelen siparişler ekranı
-- [ ] Satıcı bazında sipariş kalemlerini listeleme
+- [x] Satıcıya gelen siparişler ekranı
+- [x] Satıcı bazında sipariş kalemlerini listeleme
 - [ ] Satıcı satış ve ciro istatistikleri
 
 ## 5. Sipariş ve kargo yönetimi
 
-- [ ] Sipariş hazırlanıyor durumu
-- [ ] Kargoya verildi durumu
-- [ ] Kargo firması ve takip numarası
-- [ ] Teslim edildi durumu
-- [ ] Müşterinin sipariş takibi
-- [ ] Sipariş durumu değiştirme yetkileri
+- [x] Sipariş hazırlanıyor durumu
+- [x] Kargoya verildi durumu
+- [x] Kargo firması ve takip numarası
+- [x] Teslim edildi durumu
+- [x] Müşterinin sipariş takibi
+- [x] Sipariş durumu değiştirme yetkileri
 
 Planlanan akış:
 paid -> preparing -> shipped -> delivered
 
 ## 6. Admin paneli
 
-- [ ] Admin yönetim arayüzü
+- [x] Admin yönetim arayüzü
 - [ ] Kullanıcı yönetimi
-- [ ] Satıcı ve mağaza denetimi
-- [ ] Ürün ve sipariş denetimi
+- [x] Satıcı ve mağaza denetimi
+- [x] Ürün ve sipariş denetimi
 - [ ] Komisyon hesaplama
 - [ ] Platform satış raporları
 
@@ -163,10 +164,5 @@ bu durumda backend terminalindeki başlangıç hatasını kontrol edin.
 
 ## Sıradaki geliştirme
 
-Ders 22: Satıcı sipariş yönetimi.
-
-Satıcı, müşterilerin kendi mağazasından satın aldığı
-ürünleri ve siparişleri görebilmeli.
-
-Ardından kargo süreçleri, müşteri takibi ve admin paneli
-geliştirilecek.
+Gerçek PostgreSQL entegrasyon testleri, ödeme ve iade politikasının netleştirilmesi,
+ardından komisyon tahakkuku ve platform satış raporları.
